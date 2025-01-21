@@ -54,14 +54,8 @@
 #   Cleaned up the code a little bit and tried to give some variables more readable names.
 #   Changed the icon to illustrate it does more than cylinders. Now it looks like it does rockets.
 
-VERSION_QT5 = False
-try:
-    from PyQt6.QtCore import Qt, QTimer
-    from PyQt6.QtWidgets import QApplication
-except ImportError:
-    from PyQt5.QtCore import Qt, QTimer
-    from PyQt5.QtWidgets import QApplication
-    VERSION_QT5 = True
+from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtWidgets import QApplication
 
 import math
 import numpy
@@ -111,7 +105,7 @@ catalog = i18nCatalog("customsupport")
 if catalog.hasTranslationLoaded():
     Logger.log("i", "Custom Support Cylinder Plugin translation loaded!")
 
-class CustomSupportsCylinder(Tool):
+class CustomSupportsReborn(Tool):
     def __init__(self):
        
         super().__init__()
@@ -137,10 +131,7 @@ class CustomSupportsCylinder(Tool):
         self._SMsg = catalog.i18nc("@label", "Remove All") 
         
         # Shortcut
-        if not VERSION_QT5:
-            self._shortcut_key = Qt.Key.Key_F
-        else:
-            self._shortcut_key = Qt.Key_F
+        self._shortcut_key = Qt.Key.Key_F
             
         self._controller = self.getController()
 
@@ -200,14 +191,9 @@ class CustomSupportsCylinder(Tool):
     def event(self, event):
         super().event(event)
         modifiers = QApplication.keyboardModifiers()
-        if not VERSION_QT5:
-            ctrl_is_active = modifiers & Qt.KeyboardModifier.ControlModifier
-            shift_is_active = modifiers & Qt.KeyboardModifier.ShiftModifier
-            alt_is_active = modifiers & Qt.KeyboardModifier.AltModifier
-        else:
-            ctrl_is_active = modifiers & Qt.ControlModifier
-            shift_is_active = modifiers & Qt.ShiftModifier
-            alt_is_active = modifiers & Qt.AltModifier
+        ctrl_is_active = modifiers & Qt.KeyboardModifier.ControlModifier
+        shift_is_active = modifiers & Qt.KeyboardModifier.ShiftModifier
+        alt_is_active = modifiers & Qt.KeyboardModifier.AltModifier
 
         
         if event.type == Event.MousePressEvent and MouseEvent.LeftButton in event.buttons and self._controller.getToolsEnabled():
