@@ -6,20 +6,21 @@
 //   "MSize"       : Support Maximum Size in mm
 //   "ISize"       : Support Interior Size in mm
 //   "AAngle"      : Support Angle in °
-//   "AsModel"      : Cylindrical Support created as Model
 //   "YDirection"  : Support Y direction (Abutment)
 //   "EHeights"    : Equalize heights (Abutment)
 //   "SMain"       : Scale Main direction (Freeform)
 //   "SType"       : Support Type ( Cylinder/Tube/Cube/Abutment/Freeform/Custom ) 
-//   "SubType"     : Support Freeform Type ( Cross/Section/Pillar/Bridge/Custom )
-//   "SMirror"     : Support Mirror for Freeform Type 
+//   "SubType"     : Support Freeform Type ( Cross/Section/Pillar/Bridge/Custom ) 
 //   "SOrient"     : Support Automatic Orientation for Freeform Type
+//   "SMirror"     : Support Mirror for Freeform Type
+//   "SMsg"        : Text for the Remove All Button
 //-----------------------------------------------------------------------------
 
-import QtQuick 2.2
-import QtQuick.Controls 1.2
+import QtQuick 6.0
+import QtQuick.Controls 6.0
 
-import UM 1.1 as UM
+import UM 1.6 as UM
+import Cura 1.0 as Cura
 
 Item
 {
@@ -27,15 +28,16 @@ Item
     width: childrenRect.width
     height: childrenRect.height
     UM.I18nCatalog { id: catalog; name: "customsupport"}
-
+	
     property var s_size: UM.ActiveTool.properties.getValue("SSize")
+	property int localwidth: 110
 
     function setSType(type)
     {
         // set checked state of mesh type buttons
 		cylinderButton.checked = type === 'cylinder'
 		tubeButton.checked = type === 'tube'
-        cubeButton.checked = type === 'cube'
+        cubeButton.checked = type === 'cube'  
 		abutmentButton.checked = type === 'abutment'
 		customButton.checked = type === 'custom'
 		freeformButton.checked = type === 'freeform'
@@ -45,97 +47,124 @@ Item
     Column
     {
         id: sTypeItems
-        anchors.top: parent.top;
-        anchors.left: parent.left;
-        spacing: UM.Theme.getSize("default_margin").height;
+        anchors.top: parent.top
+        anchors.left: parent.left
+        spacing: UM.Theme.getSize("default_margin").height
 
         Row // Mesh type buttons
         {
-            id: sTypeButtons
+            id: sTypeButtonsSup
             spacing: UM.Theme.getSize("default_margin").width
 
-            Button
+            UM.ToolbarButton
             {
                 id: cylinderButton
                 text: catalog.i18nc("@label", "Cylinder")
-                iconSource: "type_cylinder.svg"
+				toolItem: UM.ColorImage
+				{
+					source: Qt.resolvedUrl("type_cylinder.svg")
+					color: UM.Theme.getColor("icon")
+				}
                 property bool needBorder: true
                 checkable:true
                 onClicked: setSType('cylinder')
-                style: UM.Theme.styles.tool_button
                 checked: UM.ActiveTool.properties.getValue("SType") === 'cylinder'
-                z: 6; // Depth position 
+                z: 3 // Depth position 
             }
 
-            Button
+            UM.ToolbarButton
             {
                 id: tubeButton
-                text: catalog.i18nc("@label", "Tube");
-                iconSource: "type_tube.svg";
-                property bool needBorder: true;
-                checkable:true;
-                onClicked: setSType('tube');
-                style: UM.Theme.styles.tool_button;
-                checked: UM.ActiveTool.properties.getValue("SType") === 'tube';
-                z: 5; // Depth position 
+                text: catalog.i18nc("@label", "Tube")
+				toolItem: UM.ColorImage
+				{
+					source: Qt.resolvedUrl("type_tube.svg")
+					color: UM.Theme.getColor("icon")
+				}
+                property bool needBorder: true
+                checkable:true
+                onClicked: setSType('tube')
+                checked: UM.ActiveTool.properties.getValue("SType") === 'tube'
+                z: 2 // Depth position 
             }
 			
-            Button
+            UM.ToolbarButton
             {
-                id: cubeButton;
+                id: cubeButton
                 text: catalog.i18nc("@label", "Cube")
-                iconSource: "type_cube.svg"
+				toolItem: UM.ColorImage
+				{
+					source: Qt.resolvedUrl("type_cube.svg")
+					color: UM.Theme.getColor("icon")
+				}
                 property bool needBorder: true
                 checkable: true
                 onClicked: setSType('cube')
-                style: UM.Theme.styles.tool_button
                 checked: UM.ActiveTool.properties.getValue("SType") === 'cube'
-                z: 4; // Depth position 
+                z: 1 // Depth position 
             }
 
-            Button
+
+        }
+		Row // Mesh type buttons
+        {
+			id: sTypeButtons
+			anchors.top: sTypeItems.Bottom
+			spacing: UM.Theme.getSize("default_margin").height
+			
+            UM.ToolbarButton
             {
                 id: abutmentButton
                 text: catalog.i18nc("@label", "Abutment")
-                iconSource: "type_abutment.svg"
+				toolItem: UM.ColorImage
+				{
+					source: Qt.resolvedUrl("type_abutment.svg")
+					color: UM.Theme.getColor("icon")
+				}
                 property bool needBorder: true
                 checkable: true
                 onClicked: setSType('abutment')
-                style: UM.Theme.styles.tool_button
                 checked: UM.ActiveTool.properties.getValue("SType") === 'abutment'
-                z: 3; // Depth position 
+                z: 3 // Depth position 
             }
 
-            Button
+            UM.ToolbarButton
             {
                 id: freeformButton
                 text: catalog.i18nc("@label", "Freeform")
-                iconSource: "type_freeform.svg"
+				toolItem: UM.ColorImage
+				{
+					source: Qt.resolvedUrl("type_freeform.svg")
+					color: UM.Theme.getColor("icon")
+				}
                 property bool needBorder: true
                 checkable:true
                 onClicked: setSType('freeform')
-                style: UM.Theme.styles.tool_button
                 checked: UM.ActiveTool.properties.getValue("SType") === 'freeform'
-                z: 2; // Depth position 
+                z: 2 // Depth position 
             }
 			
-            Button
+            UM.ToolbarButton
             {
                 id: customButton
                 text: catalog.i18nc("@label", "Custom")
-                iconSource: "type_custom.svg"
+				toolItem: UM.ColorImage
+				{
+					source: Qt.resolvedUrl("type_custom.svg")
+					color: UM.Theme.getColor("icon")
+				}
                 property bool needBorder: true
                 checkable:true
                 onClicked: setSType('custom')
-                style: UM.Theme.styles.tool_button
                 checked: UM.ActiveTool.properties.getValue("SType") === 'custom'
-                z: 1; // Depth position 
-            }
-        }
+                z: 1 // Depth position 
+            }		
+		}
     }
+	
     Grid
     {
-        id: textfields;
+        id: textfields
         anchors.leftMargin: UM.Theme.getSize("default_margin").width
         anchors.top: sTypeItems.bottom
 		anchors.topMargin: UM.Theme.getSize("default_margin").height
@@ -179,6 +208,7 @@ Item
             width: Math.ceil(contentWidth) //Make sure that the grid cells have an integer width.
         }
 
+	
 		Label
         {
             height: UM.Theme.getSize("setting_control").height
@@ -203,13 +233,12 @@ Item
             width: Math.ceil(contentWidth) //Make sure that the grid cells have an integer width.
         }
 		
-        TextField
+        UM.TextFieldWithUnit
         {
             id: sizeTextField
-            width: UM.Theme.getSize("setting_control").width
+            width: localwidth
             height: UM.Theme.getSize("setting_control").height
-            property string unit: "mm"
-            style: UM.Theme.styles.text_field;
+            unit: "mm"
             text: UM.ActiveTool.properties.getValue("SSize")
             validator: DoubleValidator
             {
@@ -225,13 +254,12 @@ Item
             }
         }
 
-        TextField
+        UM.TextFieldWithUnit
         {
             id: maxTextField
-            width: UM.Theme.getSize("setting_control").width
+            width: localwidth
             height: UM.Theme.getSize("setting_control").height
-            property string unit: "mm"
-            style: UM.Theme.styles.text_field
+            unit: "mm"
 			visible: !freeformButton.checked
             text: UM.ActiveTool.properties.getValue("MSize")
             validator: DoubleValidator
@@ -244,7 +272,7 @@ Item
             onEditingFinished:
             {
                 var modified_text = text.replace(",", ".") // User convenience. We use dots for decimal values
-                UM.ActiveTool.setProperty("MSize", modified_text);
+                UM.ActiveTool.setProperty("MSize", modified_text)
             }
         }
 
@@ -261,24 +289,23 @@ Item
 			   ListElement { text: "t-support"}
 			   ListElement { text: "custom"}
 			}
-			width: UM.Theme.getSize("setting_control").width
+			width: localwidth
 			height: UM.Theme.getSize("setting_control").height
 			visible: freeformButton.checked
 			Component.onCompleted: currentIndex = find(UM.ActiveTool.properties.getValue("SubType"))
 			
 			onCurrentIndexChanged: 
 			{ 
-				UM.ActiveTool.setProperty("SubType",cbItems.get(currentIndex).text);
+				UM.ActiveTool.setProperty("SubType",cbItems.get(currentIndex).text)
 			}
 		}	
 				
-        TextField
+        UM.TextFieldWithUnit
         {
             id: sizeInteriorTextField
-            width: UM.Theme.getSize("setting_control").width
+            width: localwidth
             height: UM.Theme.getSize("setting_control").height
-            property string unit: "mm"
-            style: UM.Theme.styles.text_field
+            unit: "mm"
 			visible: tubeButton.checked
             text: UM.ActiveTool.properties.getValue("ISize")
             validator: DoubleValidator
@@ -300,13 +327,12 @@ Item
             }
         }
 		
-		TextField
+		UM.TextFieldWithUnit
         {
             id: angleTextField
-            width: UM.Theme.getSize("setting_control").width
+            width: localwidth
             height: UM.Theme.getSize("setting_control").height
-            property string unit: "°"
-            style: UM.Theme.styles.text_field
+            unit: "°"
 			visible: !freeformButton.checked
             text: UM.ActiveTool.properties.getValue("AAngle")
             validator: IntValidator
@@ -320,119 +346,104 @@ Item
                 UM.ActiveTool.setProperty("AAngle", modified_angle_text)
             }
         }
-    }
+	}
+	
 	Item
 	{
 		id: baseCheckBox
 		width: childrenRect.width
-		height: !freeformButton.checked && !abutmentButton.checked && !cylinderButton.checked ?  0 : cylinderButton.checked ? UM.Theme.getSize("setting_control").height : abutmentButton.checked ? (UM.Theme.getSize("setting_control").height*2+UM.Theme.getSize("default_margin").height): childrenRect.height
+		height: !freeformButton.checked && !abutmentButton.checked  ? 0 : (abutmentButton.checked ? (UM.Theme.getSize("setting_control").height*2+UM.Theme.getSize("default_margin").height): childrenRect.height)
 		anchors.leftMargin: UM.Theme.getSize("default_margin").width
 		anchors.top: textfields.bottom
 		anchors.topMargin: UM.Theme.getSize("default_margin").height
 
-		CheckBox
-		{
-			id: setAsModel
-			anchors.top: baseCheckBox.top
-			// anchors.topMargin: UM.Theme.getSize("default_margin").height
-			anchors.left: parent.left
-			text: catalog.i18nc("@option:check","Define as Model")
-			style: UM.Theme.styles.partially_checkbox
-			visible: cylinderButton.checked 
-
-			checked: UM.ActiveTool.properties.getValue("AsModel")
-			onClicked: UM.ActiveTool.setProperty("AsModel", checked)
-			
-		}		
-		CheckBox
+		UM.CheckBox
 		{
 			id: useYDirectionCheckbox
 			anchors.top: baseCheckBox.top
 			// anchors.topMargin: UM.Theme.getSize("default_margin").height
 			anchors.left: parent.left
 			text: !orientCheckbox.checked || abutmentButton.checked ? catalog.i18nc("@option:check","Set on Y direction") : catalog.i18nc("@option:check","Set on Main direction")
-			style: UM.Theme.styles.partially_checkbox
-			visible: abutmentButton.checked || freeformButton.checked
+			visible: abutmentButton.checked || freeformButton.checked 
 
 			checked: UM.ActiveTool.properties.getValue("YDirection")
-			onClicked: UM.ActiveTool.setProperty("YDirection", checked)
-			
+			onClicked: UM.ActiveTool.setProperty("YDirection", checked)	
 		}
-		CheckBox
+		
+		UM.CheckBox
 		{
 			id: mirrorCheckbox
 			anchors.top: useYDirectionCheckbox.bottom
 			anchors.topMargin: UM.Theme.getSize("default_margin").height
 			anchors.left: parent.left
 			text: catalog.i18nc("@option:check","Rotate 180°")
-			style: UM.Theme.styles.partially_checkbox
 			visible: freeformButton.checked && !orientCheckbox.checked
 
 			checked: UM.ActiveTool.properties.getValue("SMirror")
 			onClicked: UM.ActiveTool.setProperty("SMirror", checked)
 			
-		}			
-		CheckBox
+		}		
+		UM.CheckBox
 		{
 			id: orientCheckbox
 			anchors.top: mirrorCheckbox.bottom
 			anchors.topMargin: UM.Theme.getSize("default_margin").height
 			anchors.left: parent.left
 			text: catalog.i18nc("@option:check","Auto Orientation")
-			style: UM.Theme.styles.partially_checkbox
 			visible: freeformButton.checked
 
 			checked: UM.ActiveTool.properties.getValue("SOrient")
 			onClicked: UM.ActiveTool.setProperty("SOrient", checked)
 			
 		}	
-		CheckBox
+		UM.CheckBox
 		{
 			id: scaleMainDirectionCheckbox
 			anchors.top: orientCheckbox.bottom
 			anchors.topMargin: UM.Theme.getSize("default_margin").height
 			anchors.left: parent.left
 			text: catalog.i18nc("@option:check","Scaling in main Directions")
-			style: UM.Theme.styles.partially_checkbox
 			visible: freeformButton.checked
 
 			checked: UM.ActiveTool.properties.getValue("SMain")
 			onClicked: UM.ActiveTool.setProperty("SMain", checked)
-			
 		}	
-		CheckBox
+		UM.CheckBox
 		{
 			id: equalizeHeightsCheckbox
 			anchors.top: useYDirectionCheckbox.bottom
 			anchors.topMargin: UM.Theme.getSize("default_margin").height
 			anchors.left: parent.left
 			text: catalog.i18nc("@option:check","Equalize heights")
-			style: UM.Theme.styles.partially_checkbox
 			visible: abutmentButton.checked
 
 			checked: UM.ActiveTool.properties.getValue("EHeights")
 			onClicked: UM.ActiveTool.setProperty("EHeights", checked)
 		}
+		
+
 	}
-	
-	Rectangle {
+
+    Rectangle {
         id: rightRect
         anchors.top: baseCheckBox.bottom
 		//color: UM.Theme.getColor("toolbar_background")
 		color: "#00000000"
-		width: UM.Theme.getSize("setting_control").width * 1.8
+		width: UM.Theme.getSize("setting_control").width * 1.3
 		height: UM.Theme.getSize("setting_control").height 
         anchors.left: parent.left
 		anchors.topMargin: UM.Theme.getSize("default_margin").height
     }
 	
-	Button
+	Cura.SecondaryButton
 	{
 		id: removeAllButton
 		anchors.centerIn: rightRect
+		spacing: UM.Theme.getSize("default_margin").height
 		width: UM.Theme.getSize("setting_control").width
-		height: UM.Theme.getSize("setting_control").height	
+		height: UM.Theme.getSize("setting_control").height		
 		text: catalog.i18nc("@label", UM.ActiveTool.properties.getValue("SMsg"))
 		onClicked: UM.ActiveTool.triggerAction("removeAllSupportMesh")
 	}
+		
 }
