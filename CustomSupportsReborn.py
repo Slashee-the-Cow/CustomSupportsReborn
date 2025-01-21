@@ -70,8 +70,8 @@ from cura.Operations.SetParentOperation import SetParentOperation
 from cura.Scene.SliceableObjectDecorator import SliceableObjectDecorator
 from cura.Scene.BuildPlateDecorator import BuildPlateDecorator
 from cura.Scene.CuraSceneNode import CuraSceneNode
-from cura.Scene.CuraSceneNode import CuraSceneNode
 
+from UM.Controller import Controller
 from UM.Logger import Logger
 from UM.Message import Message
 from UM.Math.Matrix import Matrix
@@ -92,53 +92,53 @@ from UM.Settings.SettingInstance import SettingInstance
 from UM.Resources import Resources
 from UM.i18n import i18nCatalog
 
-i18n_cura_catalog = i18nCatalog("cura")
-i18n_catalog = i18nCatalog("fdmprinter.def.json")
-i18n_extrud_catalog = i18nCatalog("fdmextruder.def.json")
+#i18n_cura_catalog = i18nCatalog("cura")
+i18n_printer_catalog = i18nCatalog("fdmprinter.def.json")
+#i18n_extrud_catalog = i18nCatalog("fdmextruder.def.json")
 
 Resources.addSearchPath(
     os.path.join(os.path.abspath(os.path.dirname(__file__)))
 )  # Plugin translation file import
 
-catalog = i18nCatalog("customsupport")
+i18n_catalog = i18nCatalog("customsupportsreborn")
 
-if catalog.hasTranslationLoaded():
-    Logger.log("i", "Custom Support Cylinder Plugin translation loaded!")
+if i18n_catalog.hasTranslationLoaded():
+    Logger.log("i", "Custom Supports Reborn translation loaded")
 
 class CustomSupportsReborn(Tool):
     def __init__(self):
        
         super().__init__()
         
-        self._all_picked_node = []
+        self._supports_created: List[SceneNode] = []
         
-        self._Nb_Point = 0  
-        self._SHeights = 0
+        self._freeform_points: int = 0  
+        self._support_heights: float = 0.0
         
         # variable for menu dialog        
-        self._UseSize = 2.0
-        self._MaxSize = 10.0
-        self._UseISize = 0.0
-        self._UseAngle = 0.0
-        self._UseYDirection = False
-        self._EqualizeHeights = True
-        self._ScaleMainDirection = True
-        self._OrientSupport = False
-        self._MirrorSupport = False
-        self._SType = 'cylinder'
-        self._SubType = 'cross'
-        self._Mesg = False # To avoid message 
-        self._SMsg = catalog.i18nc("@label", "Remove All") 
+        self._support_size: float = 2.0
+        self._support_size_max: float = 10.0
+        self._support_size_inner: float = 0.0
+        self._support_angle: float = 0.0
+        self._support_y_direction: bool = False
+        self._abutment_equalize_heights: bool = True
+        self._freeform_scale_main: bool = True
+        self._freeform_orient: bool = False
+        self._freeform_mirror: bool = False
+        self._support_type: str = 'cylinder'
+        self._support_subtype: str = 'cross'
+        self._freeform_show_message:bool = False # To avoid message 
+        self._panel_remove_all_text: str = i18n_catalog.i18nc("@CustomSupportsReborn:panel:remove_all", "Remove All") 
         
         # Shortcut
-        self._shortcut_key = Qt.Key.Key_F
+        self._shortcut_key: Qt.Key = Qt.Key.Key_F
             
-        self._controller = self.getController()
+        self._controller: Controller = self.getController()
+        self._application: CuraApplication = CuraApplication.getInstance()
 
-        self._Svg_Position = Vector
-        self._selection_pass = None
+        self._custom_point_location: Vector = Vector(0,0,0)
+        self._selection_pass: SceneNode = None
         
-        self._application = CuraApplication.getInstance()
         
         self.setExposedProperties("SSize", "MSize", "ISize", "AAngle", "SType" , "YDirection" , "EHeights" , "SMain" , "SubType" , "SOrient", "SMirror", "SMsg")
         
@@ -172,20 +172,20 @@ class CustomSupportsReborn(Tool):
         self._preferences.addPreference("customsupportcylinder/s_type", "cross")
         
         # convert as float to avoid further issue
-        self._UseSize = float(self._preferences.getValue("customsupportcylinder/s_size"))
-        self._MaxSize = float(self._preferences.getValue("customsupportcylinder/m_size"))
-        self._UseISize = float(self._preferences.getValue("customsupportcylinder/i_size"))
-        self._UseAngle = float(self._preferences.getValue("customsupportcylinder/a_angle"))
+        self._support_size = float(self._preferences.getValue("customsupportcylinder/s_size"))
+        self._support_size_max = float(self._preferences.getValue("customsupportcylinder/m_size"))
+        self._support_size_inner = float(self._preferences.getValue("customsupportcylinder/i_size"))
+        self._support_angle = float(self._preferences.getValue("customsupportcylinder/a_angle"))
         # convert as boolean to avoid further issue
-        self._UseYDirection = bool(self._preferences.getValue("customsupportcylinder/y_direction"))
-        self._EqualizeHeights = bool(self._preferences.getValue("customsupportcylinder/e_heights"))
-        self._ScaleMainDirection = bool(self._preferences.getValue("customsupportcylinder/scale_main_direction"))
-        self._OrientSupport = bool(self._preferences.getValue("customsupportcylinder/s_orient"))
-        self._MirrorSupport = bool(self._preferences.getValue("customsupportcylinder/s_mirror"))
+        self._support_y_direction = bool(self._preferences.getValue("customsupportcylinder/y_direction"))
+        self._abutment_equalize_heights = bool(self._preferences.getValue("customsupportcylinder/e_heights"))
+        self._freeform_scale_main = bool(self._preferences.getValue("customsupportcylinder/scale_main_direction"))
+        self._freeform_orient = bool(self._preferences.getValue("customsupportcylinder/s_orient"))
+        self._freeform_mirror = bool(self._preferences.getValue("customsupportcylinder/s_mirror"))
         # convert as string to avoid further issue
-        self._SType = str(self._preferences.getValue("customsupportcylinder/t_type"))
+        self._support_type = str(self._preferences.getValue("customsupportcylinder/t_type"))
         # Sub type for Free Form support
-        self._SubType = str(self._preferences.getValue("customsupportcylinder/s_type"))
+        self._support_subtype = str(self._preferences.getValue("customsupportcylinder/s_type"))
  
                 
     def event(self, event):
@@ -209,7 +209,7 @@ class CustomSupportsReborn(Tool):
                 # The selection was previously cleared, do not add/remove an support mesh but
                 # use this click for selection and reactivating this tool only.
                 self._skip_press = False
-                self._SHeights=0
+                self._support_heights=0
                 return
 
             if self._selection_pass is None:
@@ -227,7 +227,7 @@ class CustomSupportsReborn(Tool):
             if node_stack:
                 if node_stack.getProperty("support_mesh", "value") and not alt_is_active:
                     self._removeSupportMesh(picked_node)
-                    self._SHeights=0
+                    self._support_heights=0
                     return
 
                 elif node_stack.getProperty("anti_overhang_mesh", "value") or node_stack.getProperty("infill_mesh", "value") or node_stack.getProperty("cutting_mesh", "value"):
@@ -240,23 +240,23 @@ class CustomSupportsReborn(Tool):
             picking_pass.render()
             
             
-            if self._SType == 'custom': 
-                self._Nb_Point += 1
-                if self._Nb_Point == 2 :
-                    picked_position =  self._Svg_Position 
+            if self._support_type == 'custom': 
+                self._freeform_points += 1
+                if self._freeform_points == 2 :
+                    picked_position =  self._custom_point_location 
                     picked_position_b = picking_pass.getPickedPosition(event.x, event.y)
-                    self._Svg_Position = picked_position_b
-                    self._Nb_Point = 0
+                    self._custom_point_location = picked_position_b
+                    self._freeform_points = 0
                     # Add the support_mesh cube at the picked location
                     self._createSupportMesh(picked_node, picked_position,picked_position_b)
                 else:
-                    self._Svg_Position = picking_pass.getPickedPosition(event.x, event.y)
+                    self._custom_point_location = picking_pass.getPickedPosition(event.x, event.y)
             
             else:
-                self._Nb_Point = 0
+                self._freeform_points = 0
                 picked_position =  picking_pass.getPickedPosition(event.x, event.y)
                 picked_position_b = picking_pass.getPickedPosition(event.x, event.y)
-                self._Svg_Position = picked_position_b
+                self._custom_point_location = picked_position_b
                     
                 # Add the support_mesh cube at the picked location
                 self._createSupportMesh(picked_node, picked_position,picked_position_b)
@@ -271,15 +271,15 @@ class CustomSupportsReborn(Tool):
         
         # Logger.log("d", "Height Model= %s", str(node_bounds.height))
         
-        if self._SType == 'cylinder':
+        if self._support_type == 'cylinder':
             node.setName("CustomSupportCylinder")
-        elif self._SType == 'tube':
+        elif self._support_type == 'tube':
             node.setName("CustomSupportTube")
-        elif self._SType == 'cube':
+        elif self._support_type == 'cube':
             node.setName("CustomSupportCube")
-        elif self._SType == 'abutment':
+        elif self._support_type == 'abutment':
             node.setName("CustomSupportAbutment")
-        elif self._SType == 'freeform':
+        elif self._support_type == 'freeform':
             node.setName("CustomSupportFreeForm")            
         else:
             node.setName("CustomSupportCustom")
@@ -297,28 +297,28 @@ class CustomSupportsReborn(Tool):
             # additionale length
             self._Sup = 0
         else :
-            if self._SType == 'cube' :
-                self._Sup = self._UseSize*0.5
-            elif self._SType == 'abutment':
-                self._Sup = self._UseSize
+            if self._support_type == 'cube' :
+                self._Sup = self._support_size*0.5
+            elif self._support_type == 'abutment':
+                self._Sup = self._support_size
             else :
-                self._Sup = self._UseSize*0.1
+                self._Sup = self._support_size*0.1
                 
         # Logger.log("d", "Additional Long Support = %s", str(self._long+self._Sup))    
             
-        if self._SType == 'cylinder':
+        if self._support_type == 'cylinder':
             # Cylinder creation Diameter , Maximum diameter , Increment angle 10°, length , top Additional Height, Angle of the support
-            mesh = self._createCylinder(self._UseSize,self._MaxSize,10,self._long,self._Sup,self._UseAngle)
-        elif self._SType == 'tube':
+            mesh = self._createCylinder(self._support_size,self._support_size_max,10,self._long,self._Sup,self._support_angle)
+        elif self._support_type == 'tube':
             # Tube creation Diameter ,Maximum diameter , Diameter Int, Increment angle 10°, length, top Additional Height , Angle of the support
-            mesh =  self._createTube(self._UseSize,self._MaxSize,self._UseISize,10,self._long,self._Sup,self._UseAngle)
-        elif self._SType == 'cube':
+            mesh =  self._createTube(self._support_size,self._support_size_max,self._support_size_inner,10,self._long,self._Sup,self._support_angle)
+        elif self._support_type == 'cube':
             # Cube creation Size,Maximum Size , length , top Additional Height, Angle of the support
-            mesh =  self._createCube(self._UseSize,self._MaxSize,self._long,self._Sup,self._UseAngle)
-        elif self._SType == 'freeform':
+            mesh =  self._createCube(self._support_size,self._support_size_max,self._long,self._Sup,self._support_angle)
+        elif self._support_type == 'freeform':
             # Cube creation Size , length
             mesh = MeshBuilder()  
-            MName = self._SubType + ".stl"
+            MName = self._support_subtype + ".stl"
             model_definition_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "models", MName)
             # Logger.log('d', 'Model_definition_path : ' + str(model_definition_path)) 
             load_mesh = trimesh.load(model_definition_path)
@@ -328,23 +328,23 @@ class CustomSupportsReborn(Tool):
             DirZ = [0, 0, 1]
             
             # Solution must be tested ( other solution just on the X Axis)
-            if self._ScaleMainDirection :
-                if (self._long * 0.5 ) < self._UseSize :
-                    Scale = self._UseSize
+            if self._freeform_scale_main :
+                if (self._long * 0.5 ) < self._support_size :
+                    Scale = self._support_size
                 else :
                     Scale = self._long * 0.5
                 load_mesh.apply_transform(trimesh.transformations.scale_matrix(Scale, origin, DirX))
                 load_mesh.apply_transform(trimesh.transformations.scale_matrix(Scale, origin, DirY))
             else :
-                load_mesh.apply_transform(trimesh.transformations.scale_matrix(self._UseSize, origin, DirX))
-                load_mesh.apply_transform(trimesh.transformations.scale_matrix(self._UseSize, origin, DirY))
+                load_mesh.apply_transform(trimesh.transformations.scale_matrix(self._support_size, origin, DirX))
+                load_mesh.apply_transform(trimesh.transformations.scale_matrix(self._support_size, origin, DirY))
                 
             # load_mesh.apply_transform(trimesh.transformations.scale_matrix(self._UseSize, origin, DirY))
  
             load_mesh.apply_transform(trimesh.transformations.scale_matrix(self._long, origin, DirZ)) 
             
             # Logger.log('d', "Info Orient Support --> " + str(self._OrientSupport))
-            if self._OrientSupport == True :
+            if self._freeform_orient == True :
                 key = "adhesion_type"
                 # This function can be triggered in the middle of a machine change, so do not proceed if the machine change has not done yet.
                 global_container_stack = CuraApplication.getInstance().getGlobalContainerStack()
@@ -353,49 +353,49 @@ class CustomSupportsReborn(Tool):
                 adhesion=global_container_stack.getProperty(key, "value") 
                    
                 if adhesion ==  'none' :
-                    if not self._Mesg :
+                    if not self._freeform_show_message :
                         definition_key=key + " label"
                         untranslated_label=extruder_stack.getProperty(key,"label")
-                        translated_label=i18n_catalog.i18nc(definition_key, untranslated_label) 
-                        Format_String = catalog.i18nc("@info:label", "Info modification current profile '") + translated_label  + catalog.i18nc("@info:label", "' parameter\nNew value : ") + catalog.i18nc("@info:label", "Skirt")                
-                        Message(text = Format_String, title = catalog.i18nc("@info:title", "Warning ! Custom Supports Cylinder")).show()
-                        self._Mesg = True
+                        translated_label=i18n_printer_catalog.i18nc(definition_key, untranslated_label) 
+                        Format_String = i18n_catalog.i18nc("@info:label", "Info modification current profile '") + translated_label  + i18n_catalog.i18nc("@info:label", "' parameter\nNew value : ") + i18n_catalog.i18nc("@info:label", "Skirt")                
+                        Message(text = Format_String, title = i18n_catalog.i18nc("@info:title", "Warning ! Custom Supports Cylinder")).show()
+                        self._freeform_show_message = True
                     # Define temporary adhesion_type=skirt to force boundary calculation ?
                     global_container_stack.setProperty(key, "value", 'skirt')
                     Logger.log('d', "Info adhesion_type --> " + str(adhesion)) 
                 _angle = self.defineAngle(EName,position)
-                if self._UseYDirection == True :
+                if self._support_y_direction == True :
                     _angle = self.mainAngle(_angle)
                 Logger.log('d', 'Angle : ' + str(_angle))
                 load_mesh.apply_transform(trimesh.transformations.rotation_matrix(_angle, [0, 0, 1]))
             
-            elif self._UseYDirection == True :
+            elif self._support_y_direction == True :
                 load_mesh.apply_transform(trimesh.transformations.rotation_matrix(math.radians(90), [0, 0, 1]))
 
-            if self._MirrorSupport == True and self._OrientSupport == False :   
+            if self._freeform_mirror == True and self._freeform_orient == False :   
                 load_mesh.apply_transform(trimesh.transformations.rotation_matrix(math.radians(180), [0, 0, 1]))
                 
             mesh =  self._toMeshData(load_mesh)
             
-        elif self._SType == 'abutment':
+        elif self._support_type == 'abutment':
             # Abutement creation Size , length , top
-            if self._EqualizeHeights == True :
+            if self._abutment_equalize_heights == True :
                 # Logger.log('d', 'SHeights : ' + str(self._SHeights)) 
-                if self._SHeights==0 :
-                    self._SHeights=position.y
+                if self._support_heights==0 :
+                    self._support_heights=position.y
                     self._SSup=self._Sup
 
-                self._top=self._SSup+(self._SHeights-position.y)
+                self._top=self._SSup+(self._support_heights-position.y)
                 
             else:
                 self._top=self._Sup
-                self._SHeights=0
+                self._support_heights=0
             
             # 
             Logger.log('d', 'top : ' + str(self._top))
             # Logger.log('d', 'MaxSize : ' + str(self._MaxSize))
             
-            mesh =  self._createAbutment(self._UseSize,self._MaxSize,self._long,self._top,self._UseAngle,self._UseYDirection)
+            mesh =  self._createAbutment(self._support_size,self._support_size_max,self._long,self._top,self._support_angle,self._support_y_direction)
         else:           
             # Custom creation Size , P1 as vector P2 as vector
             # Get support_interface_height as extra distance 
@@ -404,10 +404,10 @@ class CustomSupportsReborn(Tool):
                 extra_top = 0
             else :
                 extra_top=extruder_stack.getProperty("support_interface_height", "value")            
-            mesh =  self._createCustom(self._UseSize,self._MaxSize,position,position2,self._UseAngle,extra_top)
+            mesh =  self._createCustom(self._support_size,self._support_size_max,position,position2,self._support_angle,extra_top)
 
         # Mesh Freeform are loaded via trimesh doesn't aheve the Build method
-        if self._SType != 'freeform':
+        if self._support_type != 'freeform':
             node.setMeshData(mesh.build())
         else:
             node.setMeshData(mesh)
@@ -446,7 +446,7 @@ class CustomSupportsReborn(Tool):
         
         s_p = global_container_stack.getProperty("support_type", "value")
         if s_p ==  'buildplate' :
-            Message(text = catalog.i18nc("@info:label", "Info modification support_type new value : Everywhere"), title = catalog.i18nc("@info:title", "Warning ! Custom Supports Cylinder")).show()
+            Message(text = i18n_catalog.i18nc("@info:label", "Info modification support_type new value : Everywhere"), title = i18n_catalog.i18nc("@info:title", "Warning ! Custom Supports Cylinder")).show()
             Logger.log('d', 'Support_type different from everywhere : ' + str(s_p))
             # Define support_type=everywhere
             global_container_stack.setProperty("support_type", "value", 'everywhere')
@@ -457,8 +457,8 @@ class CustomSupportsReborn(Tool):
         op.addOperation(SetParentOperation(node, parent))
         op.push()
         node.setPosition(position, CuraSceneNode.TransformSpace.World)
-        self._all_picked_node.append(node)
-        self._SMsg = catalog.i18nc("@label", "Remove Last") 
+        self._supports_created.append(node)
+        self._panel_remove_all_text = i18n_catalog.i18nc("@label", "Remove Last") 
         self.propertyChanged.emit()
         
         CuraApplication.getInstance().getController().getScene().sceneChanged.emit(node)
@@ -1123,13 +1123,13 @@ class CustomSupportsReborn(Tool):
         return mesh
 
     def removeAllSupportMesh(self):
-        if self._all_picked_node:
-            for node in self._all_picked_node:
+        if self._supports_created:
+            for node in self._supports_created:
                 node_stack = node.callDecoration("getStack")
                 if node_stack.getProperty("support_mesh", "value"):
                     self._removeSupportMesh(node)
-            self._all_picked_node = []
-            self._SMsg = catalog.i18nc("@label", "Remove All") 
+            self._supports_created = []
+            self._panel_remove_all_text = i18n_catalog.i18nc("@label", "Remove All") 
             self.propertyChanged.emit()
         else:        
             for node in DepthFirstIterator(self._application.getController().getScene().getRoot()):
@@ -1147,7 +1147,7 @@ class CustomSupportsReborn(Tool):
         """ 
             return: golabl _UseSize  in mm.
         """           
-        return self._UseSize
+        return self._support_size
   
     def setSSize(self, SSize: str) -> None:
         """
@@ -1163,14 +1163,14 @@ class CustomSupportsReborn(Tool):
             return
         
         #Logger.log('d', 's_value : ' + str(s_value))        
-        self._UseSize = s_value
+        self._support_size = s_value
         self._preferences.setValue("customsupportcylinder/s_size", s_value)
 
     def getMSize(self) -> float:
         """ 
             return: golabl _MaxSize  in mm.
         """           
-        return self._MaxSize
+        return self._support_size_max
   
     def setMSize(self, MSize: str) -> None:
         """
@@ -1186,14 +1186,14 @@ class CustomSupportsReborn(Tool):
             return
         
         #Logger.log('d', 's_value : ' + str(s_value))        
-        self._MaxSize = s_value
+        self._support_size_max = s_value
         self._preferences.setValue("customsupportcylinder/m_size", s_value)
         
     def getISize(self) -> float:
         """ 
             return: golabl _UseISize  in mm.
         """           
-        return self._UseISize
+        return self._support_size_inner
   
     def setISize(self, ISize: str) -> None:
         """
@@ -1209,14 +1209,14 @@ class CustomSupportsReborn(Tool):
             return
         
         #Logger.log('d', 's_value : ' + str(s_value))        
-        self._UseISize = s_value
+        self._support_size_inner = s_value
         self._preferences.setValue("customsupportcylinder/i_size", s_value)
         
     def getAAngle(self) -> float:
         """ 
             return: golabl _UseAngle  in °.
         """           
-        return self._UseAngle
+        return self._support_angle
   
     def setAAngle(self, AAngle: str) -> None:
         """
@@ -1232,33 +1232,33 @@ class CustomSupportsReborn(Tool):
             return
         
         # Logger.log('d', 's_value : ' + str(s_value))        
-        self._UseAngle = s_value
+        self._support_angle = s_value
         self._preferences.setValue("customsupportcylinder/a_angle", s_value)
  
     def getSMsg(self) -> bool:
         """ 
             return: golabl _SMsg  as text paramater.
         """ 
-        return self._SMsg
+        return self._panel_remove_all_text
     
     def setSMsg(self, SMsg: str) -> None:
         """
         param SType: SMsg as text paramater.
         """
-        self._SMsg = SMsg
+        self._panel_remove_all_text = SMsg
 
         
     def getSType(self) -> bool:
         """ 
             return: golabl _SType  as text paramater.
         """ 
-        return self._SType
+        return self._support_type
     
     def setSType(self, SType: str) -> None:
         """
         param SType: SType as text paramater.
         """
-        self._SType = SType
+        self._support_type = SType
         # Logger.log('d', 'SType : ' + str(SType))   
         self._preferences.setValue("customsupportcylinder/t_type", SType)
  
@@ -1267,13 +1267,13 @@ class CustomSupportsReborn(Tool):
             return: golabl _SubType  as text paramater.
         """ 
         # Logger.log('d', 'Set SubType : ' + str(self._SubType))  
-        return self._SubType
+        return self._support_subtype
     
     def setSubType(self, SubType: str) -> None:
         """
         param SubType: SubType as text paramater.
         """
-        self._SubType = SubType
+        self._support_subtype = SubType
         # Logger.log('d', 'Get SubType : ' + str(SubType))   
         self._preferences.setValue("customsupportcylinder/s_type", SubType)
         
@@ -1281,63 +1281,63 @@ class CustomSupportsReborn(Tool):
         """ 
             return: golabl _UseYDirection  as boolean.
         """ 
-        return self._UseYDirection
+        return self._support_y_direction
     
     def setYDirection(self, YDirection: bool) -> None:
         """
         param YDirection: as boolean.
         """
-        self._UseYDirection = YDirection
+        self._support_y_direction = YDirection
         self._preferences.setValue("customsupportcylinder/y_direction", YDirection)
  
     def getEHeights(self) -> bool:
         """ 
             return: golabl _EqualizeHeights  as boolean.
         """ 
-        return self._EqualizeHeights
+        return self._abutment_equalize_heights
   
     def setEHeights(self, EHeights: bool) -> None:
         """
         param EHeights: as boolean.
         """
-        self._EqualizeHeights = EHeights
+        self._abutment_equalize_heights = EHeights
         self._preferences.setValue("customsupportcylinder/e_heights", EHeights)
  
     def getSMain(self) -> bool:
         """ 
             return: golabl _ScaleMainDirection  as boolean.
         """ 
-        return self._ScaleMainDirection
+        return self._freeform_scale_main
   
     def setSMain(self, SMain: bool) -> None:
         """
         param SMain: as boolean.
         """
-        self._ScaleMainDirection = SMain
+        self._freeform_scale_main = SMain
         self._preferences.setValue("customsupportcylinder/scale_main_direction", SMain)
         
     def getSOrient(self) -> bool:
         """ 
             return: golabl _OrientSupport  as boolean.
         """ 
-        return self._OrientSupport
+        return self._freeform_orient
   
     def setSOrient(self, SOrient: bool) -> None:
         """
         param SOrient: as boolean.
         """
-        self._OrientSupport = SOrient
+        self._freeform_orient = SOrient
         self._preferences.setValue("customsupportcylinder/s_orient", SOrient)
     
     def getSMirror(self) -> bool:
         """ 
             return: golabl _MirrorSupport  as boolean.
         """ 
-        return self._MirrorSupport
+        return self._freeform_mirror
   
     def setSMirror(self, SMirror: bool) -> None:
         """
         param SMirror: as boolean.
         """
-        self._MirrorSupport = SMirror
+        self._freeform_mirror = SMirror
         self._preferences.setValue("customsupportcylinder/s_mirror", SMirror)
