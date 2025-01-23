@@ -49,13 +49,14 @@
 # V1.0.0 - Initial release.
 #   Reverted everything to v2.8.0 manually as the version in the master branch seems to contain some "work in progress" stuff.
 #   Renamed everything. Including internally so it doesn't compete with 5@xes' verison if you still have that installed.
-#   Completely redid the translation system. This meant losing the existing translation. If anyone wants to contribue, feel free!
+#   Futzed around with the translation system and ended up with basically the same thing. 
 #   Removed support for Qt 5 and bumped minimum Cura version to 5.0 so I'm not doing things twice and can use newer Python features if I need.
 #   Cleaned up the code a little bit and tried to give some variables more readable names.
 #   Changed the icon to illustrate it does more than cylinders. Now it looks like it does rockets.
 #   Renamed "Freeform" to "Model" and "Custom" to "Line" and swapped their positions.
 
-from PyQt6.QtCore import Qt, QTimer, qmlRegisterType
+from PyQt6.QtCore import Qt, QTimer, QObject, pyqtProperty
+from PyQt6.QtQml import qmlRegisterType
 from PyQt6.QtWidgets import QApplication
 
 import math
@@ -95,6 +96,7 @@ from UM.Tool import Tool
 from UM.Settings.SettingInstance import SettingInstance
 from UM.Resources import Resources
 from UM.i18n import i18nCatalog
+from UM.Qt.Bindings import addProperty
 
 #i18n_cura_catalog = i18nCatalog("cura")
 #i18n_printer_catalog = i18nCatalog("fdmprinter.def.json")
@@ -117,18 +119,44 @@ class SupportTypes(Enum):
     LINE = "line"
     MODEL = "model"
 
-qmlRegisterType(SupportTypes, "CustomSupportsReborn",1,0,"SupportTypes")
+class QmlSupportTypes(QObject):
+    def __init__(self, parent = None):
+        super.__init__(parent)
+
+    @pyqtProperty(str, constant=True)
+    def CYLINDER(self): return SupportTypes.CYLINDER.value
+
+    @pyqtProperty(str, constant=True)
+    def TUBE(self): return SupportTypes.TUBE.value
+
+    @pyqtProperty(str, constant=True)
+    def CUBE(self): return SupportTypes.CUBE.value
+
+    @pyqtProperty(str, constant=True)
+    def ABUTMENT(self): return SupportTypes.ABUTMENT.value
+
+    @pyqtProperty(str, constant=True)
+    def LINE(self): return SupportTypes.LINE.value
+
+    @pyqtProperty(str, constant=True)
+    def MODEL(self): return SupportTypes.MODEL.value
+
+qmlRegisterType(QmlSupportTypes, "CustomSupportsReborn",1,0,"SupportTypes")
 
 
 class CustomSupportsReborn(Tool):
 
-    _translations = CustomSupportsRebornTranslations()
+    #_translations = CustomSupportsRebornTranslations()
     plugin_name = "@CustomSupportsReborn:"
     #propertyChanged = pyqtSignal(str)
 
     def __init__(self):
        
         super().__init__()
+
+        self._translations = CustomSupportsRebornTranslations()
+        addProperty(self, "translations", "core", self._translations)
+
         self._supports_created: List[SceneNode] = []
         
         self._line_points: int = 0  
@@ -202,16 +230,8 @@ class CustomSupportsReborn(Tool):
         # Sub type for Free Form support
         self._support_subtype = str(self._preferences.getValue("customsupportsreborn/support_subtype"))
 
-    @classmethod
-    def getTranslation(cls, key):
-        if key.startswith("@"):
-            return cls._translations.getTranslation(key)
-        else:
-            return cls._translations.getTranslation(cls.plugin_name + key)
-    
-    def i18n(self, key):
-        return self.getTranslation(key)
- 
+    def getTranslation(self, key):
+        return self._translations.getTranslation(key)
                 
     def event(self, event):
         super().event(event)

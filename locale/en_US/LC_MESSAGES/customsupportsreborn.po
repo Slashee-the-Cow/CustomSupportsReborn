@@ -1,0 +1,129 @@
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"PO-Revision-Date: 2025-01-23 21:43+1100\n"
+"Last-Translator: <EMAIL@ADDRESS>\n"
+"Language-Team: English\n"
+"Language: en_US\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=CP1252\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+msgid "supportTypes:cylinder"
+msgstr "cylinder"
+
+msgid "supportTypes:tube"
+msgstr "tube"
+
+msgid "supportTypes:cube"
+msgstr "cube"
+
+msgid "supportTypes:abutment"
+msgstr "abutment"
+
+msgid "supportTypes:line"
+msgstr "line"
+
+msgid "supportTypes:model"
+msgstr "model"
+
+msgid "panel:remove_all"
+msgstr "Remove All"
+
+msgid "panel:remove_last"
+msgstr "Remove Last"
+
+msgid "panel:size"
+msgstr "Size"
+
+msgid "panel:max_size"
+msgstr "Max Size"
+
+msgid "panel:model"
+msgstr "Model"
+
+msgid "panel:inner_size"
+msgstr "Inner Size"
+
+msgid "panel:angle"
+msgstr "Angle"
+
+msgid "panel:set_on_y"
+msgstr "Set on Y direction"
+
+msgid "panel:set_on_main"
+msgstr "Set on main direction"
+
+msgid "panel:model_mirror"
+msgstr "Rotate 180°"
+
+msgid "panel:model_auto_orientate"
+msgstr "Auto Orientate"
+
+msgid "panel:model_scale_main"
+msgstr "Scale in main direction"
+
+msgid "panel:abutment_equalize_heights"
+msgstr "Equalize Heights"
+
+msgid "supportTypeLabels:cylinder"
+msgstr "Cylinder"
+
+msgid "supportTypeLabels:tube"
+msgstr "Tube"
+
+msgid "supportTypeLabels:cube"
+msgstr "Cube"
+
+msgid "supportTypeLabels:abutment"
+msgstr "Abutment"
+
+msgid "supportTypeLabels:line"
+msgstr "Line"
+
+msgid "supportTypeLabels:model"
+msgstr "Model"
+
+msgid "nodeNames:cylinder"
+msgstr "CustomSupportCylinder"
+
+msgid "nodeNames:tube"
+msgstr "CustomSupportTube"
+
+msgid "nodeNames:cube"
+msgstr "CustomSupportCube"
+
+msgid "nodeNames:abutment"
+msgstr "CustomSupportAbutment"
+
+msgid "nodeNames:line"
+msgstr "CustomSupportLine"
+
+msgid "nodeNames:model"
+msgstr "CustomSupportModel"
+
+msgid "model_warning_dialog:start"
+msgstr "Had to change setting"
+
+msgid "model_warning_dialog:middle"
+msgstr "to"
+
+msgid "model_warning_dialog:end"
+msgstr "for calculation purposes. You may want to change it back."
+
+msgid "model_warning_dialog:title"
+msgstr "WARNING: Custom Supports Reborn"
+
+msgid "support_placement_warning:start"
+msgstr "Had to change setting"
+
+msgid "support_placement_warning:middle"
+msgstr "to"
+
+msgid "support_placement_warning:end"
+msgstr "for support to work."
+
+msgid "support_placement_warning:title"
+msgstr "WARNING: Custom Supports Reborn"

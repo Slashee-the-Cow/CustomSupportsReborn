@@ -1,0 +1,120 @@
+#
+msgid ""
+msgstr ""
+
+msgid "supportTypes:cylinder"
+msgstr ""
+
+msgid "supportTypes:tube"
+msgstr ""
+
+msgid "supportTypes:cube"
+msgstr ""
+
+msgid "supportTypes:abutment"
+msgstr ""
+
+msgid "supportTypes:line"
+msgstr ""
+
+msgid "supportTypes:model"
+msgstr ""
+
+msgid "panel:remove_all"
+msgstr ""
+
+msgid "panel:remove_last"
+msgstr ""
+
+msgid "panel:size"
+msgstr ""
+
+msgid "panel:max_size"
+msgstr ""
+
+msgid "panel:model"
+msgstr ""
+
+msgid "panel:inner_size"
+msgstr ""
+
+msgid "panel:angle"
+msgstr ""
+
+msgid "panel:set_on_y"
+msgstr ""
+
+msgid "panel:set_on_main"
+msgstr ""
+
+msgid "panel:model_mirror"
+msgstr ""
+
+msgid "panel:model_auto_orientate"
+msgstr ""
+
+msgid "panel:model_scale_main"
+msgstr ""
+
+msgid "panel:abutment_equalize_heights"
+msgstr ""
+
+msgid "supportTypeLabels:cylinder"
+msgstr ""
+
+msgid "supportTypeLabels:tube"
+msgstr ""
+
+msgid "supportTypeLabels:cube"
+msgstr ""
+
+msgid "supportTypeLabels:abutment"
+msgstr ""
+
+msgid "supportTypeLabels:line"
+msgstr ""
+
+msgid "supportTypeLabels:model"
+msgstr ""
+
+msgid "nodeNames:cylinder"
+msgstr ""
+
+msgid "nodeNames:tube"
+msgstr ""
+
+msgid "nodeNames:cube"
+msgstr ""
+
+msgid "nodeNames:abutment"
+msgstr ""
+
+msgid "nodeNames:line"
+msgstr ""
+
+msgid "nodeNames:model"
+msgstr ""
+
+msgid "model_warning_dialog:start"
+msgstr ""
+
+msgid "model_warning_dialog:middle"
+msgstr ""
+
+msgid "model_warning_dialog:end"
+msgstr ""
+
+msgid "model_warning_dialog:title"
+msgstr ""
+
+msgid "support_placement_warning:start"
+msgstr ""
+
+msgid "support_placement_warning:middle"
+msgstr ""
+
+msgid "support_placement_warning:end"
+msgstr ""
+
+msgid "support_placement_warning:title"
+msgstr ""
