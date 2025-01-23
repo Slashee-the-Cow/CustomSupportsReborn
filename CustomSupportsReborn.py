@@ -55,13 +55,14 @@
 #   Changed the icon to illustrate it does more than cylinders. Now it looks like it does rockets.
 #   Renamed "Freeform" to "Model" and "Custom" to "Line" and swapped their positions.
 
-from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtCore import Qt, QTimer, qmlRegisterType
 from PyQt6.QtWidgets import QApplication
 
 import math
 import numpy
 import os.path
 import trimesh
+from enum import Enum
 
 from .Translations import CustomSupportsRebornTranslations
 
@@ -108,10 +109,21 @@ from UM.i18n import i18nCatalog
 #if i18n_catalog.hasTranslationLoaded():
 #    Logger.log("i", "Custom Supports Reborn translation loaded")
 
-_translations = CustomSupportsRebornTranslations()
+class SupportTypes(Enum):
+    CYLINDER = "cylinder"
+    TUBE = "tube"
+    CUBE = "cube"
+    ABUTMENT = "abutment"
+    LINE = "line"
+    MODEL = "model"
+
+qmlRegisterType(SupportTypes, "CustomSupportsReborn",1,0,"SupportTypes")
+
 
 class CustomSupportsReborn(Tool):
 
+    _translations = CustomSupportsRebornTranslations()
+    plugin_name = "@CustomSupportsReborn:"
     #propertyChanged = pyqtSignal(str)
 
     def __init__(self):
@@ -135,7 +147,7 @@ class CustomSupportsReborn(Tool):
         self._support_type: str = 'cylinder'
         self._support_subtype: str = 'cross'
         self._model_hide_message:bool = False # To avoid message 
-        self._panel_remove_all_text: str = i18n_catalog.i18nc("@CustomSupportsReborn:panel:remove_all", "Remove All") 
+        self._panel_remove_all_text: str = self.getTranslation("@CustomSupportsReborn:panel:remove_all")
         
         # Shortcut
         self._shortcut_key: Qt.Key = Qt.Key.Key_F
@@ -171,7 +183,7 @@ class CustomSupportsReborn(Tool):
         self._preferences.addPreference("customsupportsreborn/model_scale_main", True)
         self._preferences.addPreference("customsupportsreborn/model_orient", False)
         self._preferences.addPreference("customsupportsreborn/model_mirror", False)
-        self._preferences.addPreference("customsupportsreborn/support_type", "cylinder")
+        self._preferences.addPreference("customsupportsreborn/support_type", SupportTypes.CYLINDER)
         self._preferences.addPreference("customsupportsreborn/support_subtype", "cross")
         
         # convert as float to avoid further issue
@@ -192,7 +204,10 @@ class CustomSupportsReborn(Tool):
 
     @classmethod
     def getTranslation(cls, key):
-        return cls._translations.getTranslation(key)
+        if key.startswith("@"):
+            return cls._translations.getTranslation(key)
+        else:
+            return cls._translations.getTranslation(cls.plugin_name + key)
     
     def i18n(self, key):
         return self.getTranslation(key)
@@ -357,17 +372,25 @@ class CustomSupportsReborn(Tool):
             if self._model_orient == True :
                 # This function can be triggered in the middle of a machine change, so do not proceed if the machine change has not done yet.
                 global_container_stack = CuraApplication.getInstance().getGlobalContainerStack()
-                adhesion=global_container_stack.getProperty("adhesion_type", "value") 
+                adhesion_key = "adhesion_type"
+                adhesion_value=global_container_stack.getProperty(adhesion_key, "value")
                    
-                if adhesion == 'none' :
+                if adhesion_value == 'none' :
+                    adhesion_options = global_container_stack.getProperty(adhesion_key, "options")
+
+                    global_container_stack.setProperty("adhesion_type", "value", "skirt")
+                    Logger.log('d', "Info adhesion_type --> " + str(adhesion_value)) 
                     if not self._model_hide_message :
-                        translated_label=global_container_stack.getProperty("adhesion_type", "label") 
-                        warning_string = i18n_catalog.i18nc("@info:label", "Info modification current profile '") + translated_label  + i18n_catalog.i18nc("@info:label", "' parameter\nNew value : ") + i18n_catalog.i18nc("@info:label", "Skirt")                
-                        Message(text = warning_string, title = i18n_catalog.i18nc("@info:title", "Warning ! Custom Supports Cylinder")).show()
+                        try:
+                            translated_skirt_label = adhesion_options["skirt"]
+                        except:
+                            translated_skirt_label = "Skirt"  # Fallback if "skirt" is not in options (unlikely but good practice)
+                            Logger.log("w", "Setting adhesion_type does not have 'skirt' as an option")
+                        adhesion_label=global_container_stack.getProperty("adhesion_type", "label") 
+                        warning_string = f"{self.getTranslation('@CustomSupportsReborn.model_warning_dialog.start')} {adhesion_label} {self.getTranslation('@CustomSupportsReborn:model_warning_dialog:middle')} {translated_skirt_label} {self.getTranslation('@CustomSupportsReborn:model_warning_dialog:end')}"
+                        Message(text = warning_string, title = self.getTranslation("@CustomSupportsReborn.model_warning_dialog.title").show())
                         self._model_hide_message = True
                     # Define temporary adhesion_type=skirt to force boundary calculation ?
-                    global_container_stack.setProperty(key, "value", 'skirt')
-                    Logger.log('d', "Info adhesion_type --> " + str(adhesion)) 
                 _angle = self.defineAngle(EName,position)
                 if self._support_y_direction == True :
                     _angle = self.mainAngle(_angle)
@@ -449,10 +472,21 @@ class CustomSupportsReborn(Tool):
 
         global_container_stack = CuraApplication.getInstance().getGlobalContainerStack()    
         
-        s_p = global_container_stack.getProperty("support_type", "value")
-        if s_p ==  'buildplate' :
-            Message(text = i18n_catalog.i18nc("@info:label", "Info modification support_type new value : Everywhere"), title = i18n_catalog.i18nc("@info:title", "Warning ! Custom Supports Cylinder")).show()
-            Logger.log('d', 'Support_type different from everywhere : ' + str(s_p))
+        support_placement = global_container_stack.getProperty("support_type", "value")
+        support_placement_label = global_container_stack.getProperty("support_type", "label")
+        if support_placement ==  'buildplate' :
+            support_placement_options = global_container_stack.getProperty("support_type", "options")
+            if support_placement_options is not None:
+                try:
+                    translated_support_placement = support_placement_options["everywhere"]
+                except KeyError:
+                    translated_support_placement = "Everywhere"
+                    Logger.log("w", "Setting support_type does not have 'everywhere' as an option")
+            else:
+                translated_support_placement = "Everywhere"
+                Logger.log("w", "Setting support_type does not have any options defined") # Log if no options are defined
+            Message(text = f"{self.getTranslation('@CustomSupportsReborn.support_placement_warning:dialog:start')} {support_placement_label} {self.getTranslation('@CustomSupportsReborn:support_placement_warning:middle')} {translated_support_placement} {self.getTranslation('@CustomSupportsReborn:support_placement_warning:end')}", title = self.getTranslation("@CustomSupportsReborn:support_placement_warning:title")).show()
+            Logger.log('d', 'Support_type different from everywhere : ' + str(support_placement))
             # Define support_type=everywhere
             global_container_stack.setProperty("support_type", "value", 'everywhere')
             
@@ -463,7 +497,7 @@ class CustomSupportsReborn(Tool):
         op.push()
         node.setPosition(position, CuraSceneNode.TransformSpace.World)
         self._supports_created.append(node)
-        self._panel_remove_all_text = i18n_catalog.i18nc("@label", "Remove Last") 
+        self._panel_remove_all_text = self.getTranslation("@CustomSupportsReborn:panel:remove_last")
         self.propertyChanged.emit()
         
         CuraApplication.getInstance().getController().getScene().sceneChanged.emit(node)
@@ -1134,7 +1168,7 @@ class CustomSupportsReborn(Tool):
                 if node_stack.getProperty("support_mesh", "value"):
                     self._removeSupportMesh(node)
             self._supports_created = []
-            self._panel_remove_all_text = i18n_catalog.i18nc("@label", "Remove All") 
+            self._panel_remove_all_text = self.getTranslation("@CustomSupportsReborn:panel:remove_all")
             self.propertyChanged.emit()
         else:        
             for node in DepthFirstIterator(self._application.getController().getScene().getRoot()):
@@ -1197,6 +1231,8 @@ class CustomSupportsReborn(Tool):
 
         if new_value <= 0:
             return
+        if new_value >= self._support_size:
+            new_value = self._support_size
         
         #Logger.log('d', 's_value : ' + str(s_value))        
         self._support_size_inner = new_value
@@ -1233,10 +1269,10 @@ class CustomSupportsReborn(Tool):
 
     panelRemoveAllText = property(getPanelRemoveAllText, setPanelRemoveAllText)
         
-    def getSupportType(self) -> str:
+    def getSupportType(self) -> SupportTypes:
         return self._support_type
     
-    def setSupportType(self, new_type: str) -> None:
+    def setSupportType(self, new_type: SupportTypes) -> None:
         self._support_type = new_type
         # Logger.log('d', 'SType : ' + str(SType))   
         self._preferences.setValue("customsupportsreborn/support_type", new_type)
