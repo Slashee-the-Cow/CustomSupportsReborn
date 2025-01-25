@@ -11,8 +11,8 @@ def getMetaData():
     """Tell Cura all about CustomSupportsReborn"""
     return {
         "tool": {
-            "name": i18n_catalog.i18nc("@CustomSupportsReborn:tool:name", "Custom Supports Reborn"),
-            "description": i18n_catalog.i18nc("@CustomSupportsReborn:tool:tooltip", "Add several types of custom support"),
+            "name": i18n_catalog.i18nc("@tool:name", "Custom Supports Reborn"),
+            "description": i18n_catalog.i18nc("@tool:tooltip", "Add several types of custom support"),
             "icon": "tool_icon.svg",
             "tool_panel": "qml/CustomSupportsReborn.qml",
             "weight": 8

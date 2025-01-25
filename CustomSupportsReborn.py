@@ -55,7 +55,7 @@
 #   Changed the icon to illustrate it does more than cylinders. Now it looks like it does rockets.
 #   Renamed "Freeform" to "Model" and "Custom" to "Line" and swapped their positions.
 
-from PyQt6.QtCore import Qt, QTimer, QObject, pyqtProperty
+from PyQt6.QtCore import Qt, QTimer, QObject, QVariant, pyqtProperty
 from PyQt6.QtQml import qmlRegisterType
 from PyQt6.QtWidgets import QApplication
 
@@ -64,8 +64,6 @@ import numpy
 import os.path
 import trimesh
 from enum import Enum
-
-from .Translations import CustomSupportsRebornTranslations
 
 from typing import Optional, List
 
@@ -96,7 +94,6 @@ from UM.Tool import Tool
 from UM.Settings.SettingInstance import SettingInstance
 from UM.Resources import Resources
 from UM.i18n import i18nCatalog
-from UM.Qt.Bindings import addProperty
 
 #i18n_cura_catalog = i18nCatalog("cura")
 #i18n_printer_catalog = i18nCatalog("fdmprinter.def.json")
@@ -147,15 +144,19 @@ qmlRegisterType(QmlSupportTypes, "CustomSupportsReborn",1,0,"SupportTypes")
 class CustomSupportsReborn(Tool):
 
     #_translations = CustomSupportsRebornTranslations()
-    plugin_name = "@CustomSupportsReborn:"
+    #plugin_name = "@CustomSupportsReborn:"
     #propertyChanged = pyqtSignal(str)
 
     def __init__(self):
        
         super().__init__()
 
-        self._translations = CustomSupportsRebornTranslations()
-        addProperty(self, "translations", "core", self._translations)
+        Resources.addSearchPath(os.path.abspath(os.path.join(
+            os.path.dirname(__file__),
+            "resources"
+        )))  # Plugin translation file import
+
+        self._catalog = i18nCatalog("customsupportsreborn")
 
         self._supports_created: List[SceneNode] = []
         
@@ -175,7 +176,7 @@ class CustomSupportsReborn(Tool):
         self._support_type: str = 'cylinder'
         self._support_subtype: str = 'cross'
         self._model_hide_message:bool = False # To avoid message 
-        self._panel_remove_all_text: str = self.getTranslation("@CustomSupportsReborn:panel:remove_all")
+        self._panel_remove_all_text: str = self._catalog.i18nc("panel:remove_all", "Remove All")
         
         # Shortcut
         self._shortcut_key: Qt.Key = Qt.Key.Key_F
@@ -230,8 +231,6 @@ class CustomSupportsReborn(Tool):
         # Sub type for Free Form support
         self._support_subtype = str(self._preferences.getValue("customsupportsreborn/support_subtype"))
 
-    def getTranslation(self, key):
-        return self._translations.getTranslation(key)
                 
     def event(self, event):
         super().event(event)
@@ -316,18 +315,18 @@ class CustomSupportsReborn(Tool):
         
         # Logger.log("d", "Height Model= %s", str(node_bounds.height))
         
-        if self._support_type == 'cylinder':
-            node.setName(self.getTranslation("@CustomSupportsReborn:nodeNames:cylinder"))
-        elif self._support_type == 'tube':
-            node.setName(self.getTranslation("@CustomSuportsReborn:nodeNames:tube"))
-        elif self._support_type == 'cube':
-            node.setName(self.getTranslation("@CustomSuportsReborn:nodeNames:cube"))
-        elif self._support_type == 'abutment':
-            node.setName(self.getTranslation("@CustomSuportsReborn:nodeNames:abutment"))
-        elif self._support_type == "line":
-            node.setName(self.getTranslation("@CustomSuportsReborn:nodeNames:line"))
+        if self._support_type == SupportTypes.CYLINDER:
+            node.setName(self._catalog.i18nc("nodeNames:cylinder", "CustomSupportCylinder"))
+        elif self._support_type == SupportTypes.TUBE:
+            node.setName(self._catalog.i18nc("nodeNames:tube", "CustomSupportTube"))
+        elif self._support_type == SupportTypes.CUBE:
+            node.setName(self._catalog.i18nc("nodeNames:cube", "CustomSupportCube"))
+        elif self._support_type == SupportTypes.ABUTMENT:
+            node.setName(self._catalog.i18nc("nodeNames:abutment", "CustomSupportAbutment"))
+        elif self._support_type == SupportTypes.LINE:
+            node.setName(self._catalog.i18nc("nodeNames:line", "CustomSupportLine"))
         else:
-            node.setName(self.getTranslation("@CustomSuportsReborn:nodeNames:model"))
+            node.setName(self._catalog.i18nc("nodeNames:model", "CustomSupportModel"))
             
         node.setSelectable(True)
         
@@ -342,25 +341,25 @@ class CustomSupportsReborn(Tool):
             # additionale length
             self._Sup = 0
         else :
-            if self._support_type == 'cube' :
+            if self._support_type == SupportTypes.CUBE:
                 self._Sup = self._support_size*0.5
-            elif self._support_type == 'abutment':
+            elif self._support_type == SupportTypes.ABUTMENT:
                 self._Sup = self._support_size
             else :
                 self._Sup = self._support_size*0.1
                 
         # Logger.log("d", "Additional Long Support = %s", str(self._long+self._Sup))    
             
-        if self._support_type == 'cylinder':
+        if self._support_type == SupportTypes.CYLINDER:
             # Cylinder creation Diameter , Maximum diameter , Increment angle 10°, length , top Additional Height, Angle of the support
             mesh = self._createCylinder(self._support_size,self._support_size_max,10,self._long,self._Sup,self._support_angle)
-        elif self._support_type == 'tube':
+        elif self._support_type == SupportTypes.TUBE:
             # Tube creation Diameter ,Maximum diameter , Diameter Int, Increment angle 10°, length, top Additional Height , Angle of the support
             mesh =  self._createTube(self._support_size,self._support_size_max,self._support_size_inner,10,self._long,self._Sup,self._support_angle)
-        elif self._support_type == 'cube':
+        elif self._support_type == SupportTypes.CUBE:
             # Cube creation Size,Maximum Size , length , top Additional Height, Angle of the support
             mesh =  self._createCube(self._support_size,self._support_size_max,self._long,self._Sup,self._support_angle)
-        elif self._support_type == 'model':
+        elif self._support_type == SupportTypes.MODEL:
             # Cube creation Size , length
             mesh = MeshBuilder()  
             MName = self._support_subtype + ".stl"
@@ -407,8 +406,8 @@ class CustomSupportsReborn(Tool):
                             translated_skirt_label = "Skirt"  # Fallback if "skirt" is not in options (unlikely but good practice)
                             Logger.log("w", "Setting adhesion_type does not have 'skirt' as an option")
                         adhesion_label=global_container_stack.getProperty("adhesion_type", "label") 
-                        warning_string = f"{self.getTranslation('@CustomSupportsReborn.model_warning_dialog.start')} {adhesion_label} {self.getTranslation('@CustomSupportsReborn:model_warning_dialog:middle')} {translated_skirt_label} {self.getTranslation('@CustomSupportsReborn:model_warning_dialog:end')}"
-                        Message(text = warning_string, title = self.getTranslation("@CustomSupportsReborn.model_warning_dialog.title").show())
+                        warning_string = f"{self._catalog.i18nc('model_warning_dialog:start', 'Had to change setting')} {adhesion_label} {self._catalog.i18nc('model_warning_dialog:middle', 'to')} {translated_skirt_label} {self._catalog.i18nc('model_warning_dialog:end','for calculation purposes. You may want to change it back to its previous value.')}"
+                        Message(text = warning_string, title = self._catalog.i18nc("model_warning_dialog:title", "WARNING: Custom Supports Reborn").show())
                         self._model_hide_message = True
                     # Define temporary adhesion_type=skirt to force boundary calculation ?
                 _angle = self.defineAngle(EName,position)
@@ -425,7 +424,7 @@ class CustomSupportsReborn(Tool):
                 
             mesh =  self._toMeshData(load_mesh)
             
-        elif self._support_type == 'abutment':
+        elif self._support_type == SupportTypes.ABUTMENT:
             # Abutement creation Size , length , top
             if self._abutment_equalize_heights == True :
                 # Logger.log('d', 'SHeights : ' + str(self._SHeights)) 
@@ -505,7 +504,7 @@ class CustomSupportsReborn(Tool):
             else:
                 translated_support_placement = "Everywhere"
                 Logger.log("w", "Setting support_type does not have any options defined") # Log if no options are defined
-            Message(text = f"{self.getTranslation('@CustomSupportsReborn.support_placement_warning:dialog:start')} {support_placement_label} {self.getTranslation('@CustomSupportsReborn:support_placement_warning:middle')} {translated_support_placement} {self.getTranslation('@CustomSupportsReborn:support_placement_warning:end')}", title = self.getTranslation("@CustomSupportsReborn:support_placement_warning:title")).show()
+            Message(text = f"{self._catalog.i18nc('support_placement_warning:dialog:start', 'Had to change setting')} {support_placement_label} {self._catalog.i18nc('support_placement_warning:middle', 'to')} {translated_support_placement} {self._catalog.i18nc('support_placement_warning:end', 'for support to work.')}", title = self._catalog.i18nc("support_placement_warning:title", "WARNING: Custom Supports Reborn")).show()
             Logger.log('d', 'Support_type different from everywhere : ' + str(support_placement))
             # Define support_type=everywhere
             global_container_stack.setProperty("support_type", "value", 'everywhere')
@@ -517,7 +516,7 @@ class CustomSupportsReborn(Tool):
         op.push()
         node.setPosition(position, CuraSceneNode.TransformSpace.World)
         self._supports_created.append(node)
-        self._panel_remove_all_text = self.getTranslation("@CustomSupportsReborn:panel:remove_last")
+        self._panel_remove_all_text = self._catalog.i18nc("panel:remove_last", "Remove Last")
         self.propertyChanged.emit()
         
         CuraApplication.getInstance().getController().getScene().sceneChanged.emit(node)
@@ -1188,7 +1187,7 @@ class CustomSupportsReborn(Tool):
                 if node_stack.getProperty("support_mesh", "value"):
                     self._removeSupportMesh(node)
             self._supports_created = []
-            self._panel_remove_all_text = self.getTranslation("@CustomSupportsReborn:panel:remove_all")
+            self._panel_remove_all_text = self._catalog.i18nc("panel:remove_all", "Remove All")
             self.propertyChanged.emit()
         else:        
             for node in DepthFirstIterator(self._application.getController().getScene().getRoot()):

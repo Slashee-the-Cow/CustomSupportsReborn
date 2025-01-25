@@ -20,40 +20,47 @@
 import QtQuick 6.0
 import QtQuick.Controls 6.0
 
-import UM 1.6 as UM
+import UM 1.7 as UM
 import Cura 1.0 as Cura
 import CustomSupportsReborn 1.0
+
+/*function withActiveTool(callback, defaultValue){
+        if (typeof(defaultValue) === "undefined"){
+            defaultValue = "";
+        }
+        if (UM.Controller.getActiveTool()){
+            return callback(UM.Controller.getActiveTool());
+        } else {
+            return defaultValue;
+    }*/
 
 Item
 {
     id: root
-    width: childrenRect.width
-    height: childrenRect.height
-    //UM.I18nCatalog { id: catalog; name: "customsupportsreborn"}
 
-    property var curaController: Cura.application.controller
-    function withActiveTool(callback, defaultValue){
+    UM.I18nCatalog {id: catalog; name: "customsupportsreborn"}
+
+    // property var curaController: Cura.application ? Cura.application.controller : null
+    /*function withActiveTool(callback, defaultValue){
+        console.log("curaController is: ", curaController)
+        console.log("curaController.activeTool is:", curaController.activeTool)
         if (typeof(defaultValue) === "undefined"){
-            defaultValue = ""
+            defaultValue = "";
         }
         if (curaController && curaController.activeTool){
-            return callback(curaController.activeTool)
+            return callback(curaController.activeTool);
         } else {
-            return defaultValue
+            return defaultValue;
         }
-    }
+    }*/
+    
 
-    readonly property string pluginName: "@CustomSupportsReborn:"
-    function i18n(key){
-        if (curaController && curaController.activeTool.i18n){
-            return curaController.activeTool.i18n(key)
-        }
-        return pluginName + key
-    }
 
+    width: childrenRect.width
+    height: childrenRect.height
     
     
-    property var support_size: withActiveTool(function(tool) {return tool.supportSize})
+    property var support_size: UM.ActiveTool.properties.getValue(supportSize)
     property int localwidth: 110
 
     function setSupportType(type)
@@ -83,7 +90,7 @@ Item
             UM.ToolbarButton
             {
                 id: cylinderButton
-                text: i18n("supportTypeLabels:cylinder")
+                text: catalog.i18nc("@label:shape", "Cylinder")
                 toolItem: UM.ColorImage
                 {
                     source: Qt.resolvedUrl("type_cylinder.svg")
@@ -104,7 +111,7 @@ Item
             UM.ToolbarButton
             {
                 id: tubeButton
-                text: i18n("supportTypeLabels:tube")
+                text: catalog.i18nc("@label:shape", "Tube")
                 toolItem: UM.ColorImage
                 {
                     source: Qt.resolvedUrl("type_tube.svg")
@@ -125,7 +132,7 @@ Item
             UM.ToolbarButton
             {
                 id: cubeButton
-                text: i18n("supportTypeLabels:cube")
+                text: catalog.i18nc("@label:shape", "Cube")
                 toolItem: UM.ColorImage
                 {
                     source: Qt.resolvedUrl("type_cube.svg")
@@ -148,13 +155,12 @@ Item
         Row // Mesh type buttons
         {
             id: supportTypeButtonsLower
-            anchors.top: supportTypeButtonsUpper.bottom
             spacing: UM.Theme.getSize("default_margin").width
             
             UM.ToolbarButton
             {
                 id: abutmentButton
-                text: i18n("supportTypeLabels:abutment")
+                text: catalog.i18nc("@label:shape", "Abutment")
                 toolItem: UM.ColorImage
                 {
                     source: Qt.resolvedUrl("type_abutment.svg")
@@ -175,7 +181,7 @@ Item
             UM.ToolbarButton
             {
                 id: lineButton
-                text: i18n("supportTypeLabels:line")
+                text: catalog.i18nc("@label:shape", "Line")
                 toolItem: UM.ColorImage
                 {
                     source: Qt.resolvedUrl("type_line.svg")
@@ -196,7 +202,7 @@ Item
             UM.ToolbarButton
             {
                 id: modelButton
-                text: i18n("supportTypeLabels:model")
+                text: catalog.i18nc("@label:shape", "Model")
                 toolItem: UM.ColorImage
                 {
                     source: Qt.resolvedUrl("type_model.svg")
@@ -220,7 +226,7 @@ Item
     {
         id: textfields
         anchors.leftMargin: UM.Theme.getSize("default_margin").width
-        anchors.top: supportTypeButtonsLower.bottom
+        anchors.top: supportTypeButtons.bottom
         anchors.topMargin: UM.Theme.getSize("default_margin").height
 
         columns: 2
@@ -230,7 +236,7 @@ Item
         Label
         {
             height: UM.Theme.getSize("setting_control").height
-            text: i18n("panel:size")
+            text: catalog.i18nc("panel:size", "Size")
             font: UM.Theme.getFont("default")
             color: UM.Theme.getColor("text")
             verticalAlignment: Text.AlignVCenter
@@ -241,11 +247,11 @@ Item
         Label
         {
             height: UM.Theme.getSize("setting_control").height
-            text: i18n("panel:max_size")
+            text: catalog.i18nc("panel:max_size", "Max Size")
             font: UM.Theme.getFont("default")
             color: UM.Theme.getColor("text")
             verticalAlignment: Text.AlignVCenter
-            visible: !freeformButton.checked
+            visible: !modelButton.checked
             renderType: Text.NativeRendering
             width: Math.ceil(contentWidth) //Make sure that the grid cells have an integer width.
         }
@@ -253,7 +259,7 @@ Item
         Label
         {
             height: UM.Theme.getSize("setting_control").height
-            text: i18n("panel:model")
+            text: catalog.i18nc("panel:model", "Model")
             font: UM.Theme.getFont("default")
             color: UM.Theme.getColor("text")
             verticalAlignment: Text.AlignVCenter
@@ -266,7 +272,7 @@ Item
         Label
         {
             height: UM.Theme.getSize("setting_control").height
-            text: i18n("panel:inner_size")
+            text: catalog.i18nc("panel:inner-size", "Inner Size")
             font: UM.Theme.getFont("default")
             color: UM.Theme.getColor("text")
             verticalAlignment: Text.AlignVCenter
@@ -278,7 +284,7 @@ Item
         Label
         {
             height: UM.Theme.getSize("setting_control").height
-            text: i18n("panel:angle")
+            text: catalog.i18nc("panel:angle", "Angle")
             font: UM.Theme.getFont("default")
             color: UM.Theme.getColor("text")
             verticalAlignment: Text.AlignVCenter
@@ -413,7 +419,7 @@ Item
             anchors.top: baseCheckBox.top
             // anchors.topMargin: UM.Theme.getSize("default_margin").height
             anchors.left: parent.left
-            text: !orientCheckbox.checked || abutmentButton.checked ? i18n("panel:set_on_y") : i18n("panel:set_on_main")
+            text: !modelOrientCheckbox.checked || abutmentButton.checked ? catalog.i18nc("panel:set_on_y", "Set on Y Direction") : catalog.i18nc("panel:set_on_main", "Set on Main Direction")
             visible: abutmentButton.checked || modelButton.checked 
 
             checked: withActiveTool(function(tool) {return tool.supportYDirection})
@@ -426,7 +432,7 @@ Item
             anchors.top: supportYDirectionCheckbox.bottom
             anchors.topMargin: UM.Theme.getSize("default_margin").height
             anchors.left: parent.left
-            text: i18n("panel:model_mirror")
+            text: catalog.i18nc("panel:model_mirror", "Rotate 180")
             visible: modelButton.checked && !modelOrientCheckbox.checked
 
             checked: withActiveTool(function(tool) {return tool.modelMirror})
@@ -439,7 +445,7 @@ Item
             anchors.top: modelMirrorCheckbox.bottom
             anchors.topMargin: UM.Theme.getSize("default_margin").height
             anchors.left: parent.left
-            text: i18n("panel:model_auto_orientate")
+            text: catalog.i18nc("panel:model_auto_orientate", "Auto Orientate")
             visible: modelButton.checked
 
             checked: withActiveTool(function(tool) {return tool.modelOrient})
@@ -452,7 +458,7 @@ Item
             anchors.top: modelOrientCheckbox.bottom
             anchors.topMargin: UM.Theme.getSize("default_margin").height
             anchors.left: parent.left
-            text: i18n("panel:model_scale_main")
+            text: catalog.i18nc("panel:model_scale_main", "Scale Main Direction")
             visible: modelButton.checked
 
             checked: withActiveTool(function(tool) {return tool.modelScaleMain})
@@ -464,7 +470,7 @@ Item
             anchors.top: supportYDirectionCheckbox.bottom
             anchors.topMargin: UM.Theme.getSize("default_margin").height
             anchors.left: parent.left
-            text: i18n("panel:abutment_equalize_heights")
+            text: catalog.i18nc("panel:abutment_equalize_heights", "Equalize Heights")
             visible: abutmentButton.checked
 
             checked: withActiveTool(function(tool) {return abutmentEqualizeHeights})
@@ -492,7 +498,7 @@ Item
         spacing: UM.Theme.getSize("default_margin").height
         width: UM.Theme.getSize("setting_control").width
         height: UM.Theme.getSize("setting_control").height        
-        text: i18n("panel:remove_all")
+        text: catalog.i18nc("panel:remove_all", "Remove All")
         onClicked: withActiveTool(function(tool) {tool.removeAllSupportMesh()})
     }
 }

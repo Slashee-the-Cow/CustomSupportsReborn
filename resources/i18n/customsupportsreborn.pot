@@ -1,0 +1,162 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2024-01-27 12:00+0000\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=INTEGER; plural=EXPRESSION;\n"
+
+#: .\CustomSupportsReborn.py
+msgctxt "@label"
+msgid "Size"
+msgstr ""
+
+#: .\CustomSupportsReborn.py
+#: E:\Development\Cura\CustomSupportCylinderReborn\qml\CustomSupportsReborn.qml:509
+msgctxt "panel:remove_all"
+msgid "Remove All"
+msgstr ""
+
+#: .\CustomSupportsReborn.py
+msgctxt "nodeNames:cylinder"
+msgid "CustomSupportCylinder"
+msgstr ""
+
+#: .\CustomSupportsReborn.py
+msgctxt "nodeNames:tube"
+msgid "CustomSupportTube"
+msgstr ""
+
+#: .\CustomSupportsReborn.py
+msgctxt "nodeNames:cube"
+msgid "CustomSupportCube"
+msgstr ""
+
+#: .\CustomSupportsReborn.py
+msgctxt "nodeNames:abutment"
+msgid "CustomSupportAbutment"
+msgstr ""
+
+#: .\CustomSupportsReborn.py
+msgctxt "nodeNames:line"
+msgid "CustomSupportLine"
+msgstr ""
+
+#: .\CustomSupportsReborn.py
+msgctxt "nodeNames:model"
+msgid "CustomSupportModel"
+msgstr ""
+
+#: .\CustomSupportsReborn.py
+msgctxt "support_placement_warning:title"
+msgid "WARNING: Custom Supports Reborn"
+msgstr ""
+
+#: .\CustomSupportsReborn.py
+msgctxt "panel:remove_last"
+msgid "Remove Last"
+msgstr ""
+
+#: .\CustomSupportsReborn.py
+msgctxt "@info:status"
+msgid "Please select one or more models first"
+msgstr ""
+
+#: .\__init__.py
+msgctxt "@tool:name"
+msgid "Custom Supports Reborn"
+msgstr ""
+
+#: .\__init__.py
+msgctxt "@tool:tooltip"
+msgid "Add several types of custom support"
+msgstr ""
+
+#: E:\Development\Cura\CustomSupportCylinderReborn\qml\CustomSupportsReborn.qml:100
+msgctxt "@label:shape"
+msgid "Cylinder"
+msgstr ""
+
+#: E:\Development\Cura\CustomSupportCylinderReborn\qml\CustomSupportsReborn.qml:121
+msgctxt "@label:shape"
+msgid "Tube"
+msgstr ""
+
+#: E:\Development\Cura\CustomSupportCylinderReborn\qml\CustomSupportsReborn.qml:142
+msgctxt "@label:shape"
+msgid "Cube"
+msgstr ""
+
+#: E:\Development\Cura\CustomSupportCylinderReborn\qml\CustomSupportsReborn.qml:171
+msgctxt "@label:shape"
+msgid "Abutment"
+msgstr ""
+
+#: E:\Development\Cura\CustomSupportCylinderReborn\qml\CustomSupportsReborn.qml:192
+msgctxt "@label:shape"
+msgid "Line"
+msgstr ""
+
+#: E:\Development\Cura\CustomSupportCylinderReborn\qml\CustomSupportsReborn.qml:213
+msgctxt "@label:shape"
+msgid "Model"
+msgstr ""
+
+#: E:\Development\Cura\CustomSupportCylinderReborn\qml\CustomSupportsReborn.qml:247
+msgctxt "panel:size"
+msgid "Size"
+msgstr ""
+
+#: E:\Development\Cura\CustomSupportCylinderReborn\qml\CustomSupportsReborn.qml:258
+msgctxt "panel:max_size"
+msgid "Max Size"
+msgstr ""
+
+#: E:\Development\Cura\CustomSupportCylinderReborn\qml\CustomSupportsReborn.qml:270
+msgctxt "panel:model"
+msgid "Model"
+msgstr ""
+
+#: E:\Development\Cura\CustomSupportCylinderReborn\qml\CustomSupportsReborn.qml:283
+msgctxt "panel:inner-size"
+msgid "Inner Size"
+msgstr ""
+
+#: E:\Development\Cura\CustomSupportCylinderReborn\qml\CustomSupportsReborn.qml:295
+msgctxt "panel:angle"
+msgid "Angle"
+msgstr ""
+
+#: E:\Development\Cura\CustomSupportCylinderReborn\qml\CustomSupportsReborn.qml:430
+msgid "panel:set_on_y"
+msgstr ""
+
+#: E:\Development\Cura\CustomSupportCylinderReborn\qml\CustomSupportsReborn.qml:430
+msgid "panel:set_on_main"
+msgstr ""
+
+#: E:\Development\Cura\CustomSupportCylinderReborn\qml\CustomSupportsReborn.qml:443
+msgctxt "panel:model_mirror"
+msgid "Rotate 180"
+msgstr ""
+
+#: E:\Development\Cura\CustomSupportCylinderReborn\qml\CustomSupportsReborn.qml:456
+msgctxt "panel:model_auto_orientate"
+msgid "Auto Orientate"
+msgstr ""
+
+#: E:\Development\Cura\CustomSupportCylinderReborn\qml\CustomSupportsReborn.qml:469
+msgctxt "panel:model_scale_main"
+msgid "Scale Main Direction"
+msgstr ""
+
+#: E:\Development\Cura\CustomSupportCylinderReborn\qml\CustomSupportsReborn.qml:481
+msgctxt "panel:abutment_equalize_heights"
+msgid "Equalize Heights"
+msgstr ""
