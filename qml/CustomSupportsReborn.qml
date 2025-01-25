@@ -22,56 +22,36 @@ import QtQuick.Controls 6.0
 
 import UM 1.7 as UM
 import Cura 1.0 as Cura
-import CustomSupportsReborn 1.0
-
-/*function withActiveTool(callback, defaultValue){
-        if (typeof(defaultValue) === "undefined"){
-            defaultValue = "";
-        }
-        if (UM.Controller.getActiveTool()){
-            return callback(UM.Controller.getActiveTool());
-        } else {
-            return defaultValue;
-    }*/
 
 Item
 {
     id: root
 
+    readonly property string supportTypeCylinder: "cylinder"
+    readonly property string supportTypeTube: "tube"
+    readonly property string supportTypeCube: "cube"
+    readonly property string supportTypeAbutment: "abutment"
+    readonly property string supportTypeLine: "line"
+    readonly property string supportTypeModel: "model"
+
     UM.I18nCatalog {id: catalog; name: "customsupportsreborn"}
-
-    // property var curaController: Cura.application ? Cura.application.controller : null
-    /*function withActiveTool(callback, defaultValue){
-        console.log("curaController is: ", curaController)
-        console.log("curaController.activeTool is:", curaController.activeTool)
-        if (typeof(defaultValue) === "undefined"){
-            defaultValue = "";
-        }
-        if (curaController && curaController.activeTool){
-            return callback(curaController.activeTool);
-        } else {
-            return defaultValue;
-        }
-    }*/
-    
-
 
     width: childrenRect.width
     height: childrenRect.height
     
     
-    property var support_size: UM.ActiveTool.properties.getValue("SupportSize")
+    property var support_size: UM.Controller.properties.getValue("SupportSize")
     property int localwidth: 110
 
     function setSupportType(type)
     {
         // set checked state of mesh type buttons
-        cylinderButton.checked = type === SupportTypes.CYLINDER
-        tubeButton.checked = type === SupportTypes.TUBE
-        cubeButton.checked = type === SupportTypes.CUBE
-        abutmentButton.checked = type === SupportTypes.ABUTMENT
-        lineButton.checked = type === SupportTypes.LINE
-        modelButton.checked = type === SupportTypes.MODEL
+        cylinderButton.checked = type === supportTypeCylinder
+        tubeButton.checked = type === supportTypeTube
+        cubeButton.checked = type === supportTypeCube
+        abutmentButton.checked = type === supportTypeAbutment
+        lineButton.checked = type === supportTypeLine
+        modelButton.checked = type === supportTypeModel
         withActiveTool(function(tool) {tool.supportType = type})
     }
     
@@ -98,13 +78,13 @@ Item
                 }
                 property bool needBorder: true
                 checkable:true
-                onClicked: setSupportType(SupportTypes.CYLINDER)
+                onClicked: setSupportType(supportTypeCylinder)
                 Binding{
                     target:cylinderButton
                     property: "checked"
-                    value: withActiveTool(function(tool) {return tool.supportType === SupportTypes.CYLINDER})
+                    value: withActiveTool(function(tool) {return tool.supportType === supportTypeCylinder})
                 }
-                //checked: withActiveTool(function(tool) {return tool.supportType}) === SupportTypes.CYLINDER
+                //checked: withActiveTool(function(tool) {return tool.supportType}) === supportTypeCylinder
                 z: 3 // Depth position 
             }
 
@@ -119,13 +99,13 @@ Item
                 }
                 property bool needBorder: true
                 checkable:true
-                onClicked: setSupportType(SupportTypes.TUBE)
+                onClicked: setSupportType(supportTypeTube)
                 Binding{
                     target:tubeButton
                     property: "checked"
-                    value: withActiveTool(function(tool) {return tool.supportType === SupportTypes.TUBE})
+                    value: withActiveTool(function(tool) {return tool.supportType === supportTypeTube})
                 }
-                //checked: withActiveTool(function(tool) {return tool.supportType}) === SupportTypes.TUBE
+                //checked: withActiveTool(function(tool) {return tool.supportType}) === supportTypeTube
                 z: 2 // Depth position 
             }
             
@@ -140,13 +120,13 @@ Item
                 }
                 property bool needBorder: true
                 checkable: true
-                onClicked: setSupportType(SupportTypes.CUBE)
+                onClicked: setSupportType(supportTypeCube)
                 Binding{
                     target:cubeButton
                     property: "checked"
-                    value: withActiveTool(function(tool) {return tool.supportType === SupportTypes.CUBE})
+                    value: withActiveTool(function(tool) {return tool.supportType === supportTypeCube})
                 }
-                //checked: withActiveTool(function(tool) {return tool.supportType}) === SupportTypes.CUBE
+                //checked: withActiveTool(function(tool) {return tool.supportType}) === supportTypeCube
                 z: 1 // Depth position 
             }
 
@@ -168,13 +148,13 @@ Item
                 }
                 property bool needBorder: true
                 checkable: true
-                onClicked: setSupportType(SupportTypes.ABUTMENT)
+                onClicked: setSupportType(supportTypeAbutment)
                 Binding{
                     target:abutmentButton
                     property: "checked"
-                    value: withActiveTool(function(tool) {return tool.supportType === SupportTypes.ABUTMENT})
+                    value: withActiveTool(function(tool) {return tool.supportType === supportTypeAbutment})
                 }
-                //checked: withActiveTool(function(tool) {return tool.supportType}) === SupportTypes.ABUTMENT
+                //checked: withActiveTool(function(tool) {return tool.supportType}) === supportTypeAbutment
                 z: 3 // Depth position 
             }
 
@@ -189,13 +169,13 @@ Item
                 }
                 property bool needBorder: true
                 checkable:true
-                onClicked: setSupportType(SupportTypes.LINE)
+                onClicked: setSupportType(supportTypeLine)
                 Binding{
                     target:lineButton
                     property: "checked"
-                    value: withActiveTool(function(tool) {return tool.supportType === SupportTypes.LINE})
+                    value: withActiveTool(function(tool) {return tool.supportType === supportTypeLine})
                 }
-                //checked: withActiveTool(function(tool) {return tool.supportType}) === SupportTypes.LINE
+                //checked: withActiveTool(function(tool) {return tool.supportType}) === supportTypeLine
                 z: 2 // Depth position 
             }
 
@@ -210,9 +190,9 @@ Item
                 }
                 property bool needBorder: true
                 checkable:true
-                onClicked: setSupportType(SupportTypes.MODEL)
-                checked: UM.Controller.properties.getValue("SupportType") === SupportTypes.MODEL
-                //checked: withActiveTool(function(tool) {return tool.supportType}) === SupportTypes.MODEL
+                onClicked: setSupportType(supportTypeModel)
+                checked: UM.Controller.properties.getValue("SupportType") === supportTypeModel
+                //checked: withActiveTool(function(tool) {return tool.supportType}) === supportTypeModel
                 z: 1 // Depth position 
             }
         }

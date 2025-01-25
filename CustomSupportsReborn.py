@@ -108,38 +108,14 @@ from UM.i18n import i18nCatalog
 #if i18n_catalog.hasTranslationLoaded():
 #    Logger.log("i", "Custom Supports Reborn translation loaded")
 
-class SupportTypes(Enum):
-    CYLINDER = "cylinder"
-    TUBE = "tube"
-    CUBE = "cube"
-    ABUTMENT = "abutment"
-    LINE = "line"
-    MODEL = "model"
+DEBUG_MODE = True
 
-class QmlSupportTypes(QObject):
-    def __init__(self, parent = None):
-        super.__init__(parent)
-
-    @pyqtProperty(str, constant=True)
-    def CYLINDER(self): return SupportTypes.CYLINDER.value
-
-    @pyqtProperty(str, constant=True)
-    def TUBE(self): return SupportTypes.TUBE.value
-
-    @pyqtProperty(str, constant=True)
-    def CUBE(self): return SupportTypes.CUBE.value
-
-    @pyqtProperty(str, constant=True)
-    def ABUTMENT(self): return SupportTypes.ABUTMENT.value
-
-    @pyqtProperty(str, constant=True)
-    def LINE(self): return SupportTypes.LINE.value
-
-    @pyqtProperty(str, constant=True)
-    def MODEL(self): return SupportTypes.MODEL.value
-
-qmlRegisterType(QmlSupportTypes, "CustomSupportsReborn",1,0,"SupportTypes")
-
+SUPPORT_TYPE_CYLINDER = "cylinder"
+SUPPORT_TYPE_TUBE = "tube"
+SUPPORT_TYPE_CUBE = "cube"
+SUPPORT_TYPE_ABUTMENT = "abutment"
+SUPPORT_TYPE_LINE = "line"
+SUPPORT_TYPE_MODEL = "model"
 
 class CustomSupportsReborn(Tool):
 
@@ -214,7 +190,7 @@ class CustomSupportsReborn(Tool):
         self._preferences.addPreference("customsupportsreborn/model_scale_main", True)
         self._preferences.addPreference("customsupportsreborn/model_orient", False)
         self._preferences.addPreference("customsupportsreborn/model_mirror", False)
-        self._preferences.addPreference("customsupportsreborn/support_type", SupportTypes.CYLINDER)
+        self._preferences.addPreference("customsupportsreborn/support_type", SUPPORT_TYPE_CYLINDER)
         self._preferences.addPreference("customsupportsreborn/support_subtype", "cross")
         
         # convert as float to avoid further issue
@@ -317,18 +293,21 @@ class CustomSupportsReborn(Tool):
         
         # Logger.log("d", "Height Model= %s", str(node_bounds.height))
         
-        if self._support_type == SupportTypes.CYLINDER:
+        if self._support_type == SUPPORT_TYPE_CYLINDER:
             node.setName(self._catalog.i18nc("nodeNames:cylinder", "CustomSupportCylinder"))
-        elif self._support_type == SupportTypes.TUBE:
+        elif self._support_type == SUPPORT_TYPE_TUBE:
             node.setName(self._catalog.i18nc("nodeNames:tube", "CustomSupportTube"))
-        elif self._support_type == SupportTypes.CUBE:
+        elif self._support_type == SUPPORT_TYPE_CUBE:
             node.setName(self._catalog.i18nc("nodeNames:cube", "CustomSupportCube"))
-        elif self._support_type == SupportTypes.ABUTMENT:
+        elif self._support_type == SUPPORT_TYPE_ABUTMENT:
             node.setName(self._catalog.i18nc("nodeNames:abutment", "CustomSupportAbutment"))
-        elif self._support_type == SupportTypes.LINE:
+        elif self._support_type == SUPPORT_TYPE_LINE:
             node.setName(self._catalog.i18nc("nodeNames:line", "CustomSupportLine"))
-        else:
+        elif self._support_type == SUPPORT_TYPE_MODEL:
             node.setName(self._catalog.i18nc("nodeNames:model", "CustomSupportModel"))
+        else:
+            node.setName(self._catalog.i18nc("@errors:node_support_type"), "CustomSupportError")
+            Logger.log("w", "CustomSupportsReborn: Creating a node without a valid support_type")
             
         node.setSelectable(True)
         
@@ -343,25 +322,25 @@ class CustomSupportsReborn(Tool):
             # additionale length
             self._Sup = 0
         else :
-            if self._support_type == SupportTypes.CUBE:
+            if self._support_type == SUPPORT_TYPE_CUBE:
                 self._Sup = self._support_size*0.5
-            elif self._support_type == SupportTypes.ABUTMENT:
+            elif self._support_type == SUPPORT_TYPE_ABUTMENT:
                 self._Sup = self._support_size
             else :
                 self._Sup = self._support_size*0.1
                 
         # Logger.log("d", "Additional Long Support = %s", str(self._long+self._Sup))    
             
-        if self._support_type == SupportTypes.CYLINDER:
+        if self._support_type == SUPPORT_TYPE_CYLINDER:
             # Cylinder creation Diameter , Maximum diameter , Increment angle 10°, length , top Additional Height, Angle of the support
             mesh = self._createCylinder(self._support_size,self._support_size_max,10,self._long,self._Sup,self._support_angle)
-        elif self._support_type == SupportTypes.TUBE:
+        elif self._support_type == SUPPORT_TYPE_TUBE:
             # Tube creation Diameter ,Maximum diameter , Diameter Int, Increment angle 10°, length, top Additional Height , Angle of the support
             mesh =  self._createTube(self._support_size,self._support_size_max,self._support_size_inner,10,self._long,self._Sup,self._support_angle)
-        elif self._support_type == SupportTypes.CUBE:
+        elif self._support_type == SUPPORT_TYPE_CUBE:
             # Cube creation Size,Maximum Size , length , top Additional Height, Angle of the support
             mesh =  self._createCube(self._support_size,self._support_size_max,self._long,self._Sup,self._support_angle)
-        elif self._support_type == SupportTypes.MODEL:
+        elif self._support_type == SUPPORT_TYPE_MODEL:
             # Cube creation Size , length
             mesh = MeshBuilder()  
             MName = self._support_subtype + ".stl"
@@ -426,7 +405,7 @@ class CustomSupportsReborn(Tool):
                 
             mesh =  self._toMeshData(load_mesh)
             
-        elif self._support_type == SupportTypes.ABUTMENT:
+        elif self._support_type == SUPPORT_TYPE_ABUTMENT:
             # Abutement creation Size , length , top
             if self._abutment_equalize_heights == True :
                 # Logger.log('d', 'SHeights : ' + str(self._SHeights)) 
@@ -1290,10 +1269,10 @@ class CustomSupportsReborn(Tool):
 
     panelRemoveAllText = property(getPanelRemoveAllText, setPanelRemoveAllText)
         
-    def getSupportType(self) -> SupportTypes:
+    def getSupportType(self) -> str:
         return self._support_type
     
-    def setSupportType(self, new_type: SupportTypes) -> None:
+    def setSupportType(self, new_type: str) -> None:
         self._support_type = new_type
         # Logger.log('d', 'SType : ' + str(SType))   
         self._preferences.setValue("customsupportsreborn/support_type", new_type)
