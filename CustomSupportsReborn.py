@@ -158,6 +158,8 @@ class CustomSupportsReborn(Tool):
 
         self._catalog = i18nCatalog("customsupportsreborn")
 
+        self.setExposedProperties("SupportType", "SupportSize", "SupportSizeMax", "SupportSizeInner", "SupportAngle")
+
         self._supports_created: List[SceneNode] = []
         
         self._line_points: int = 0  

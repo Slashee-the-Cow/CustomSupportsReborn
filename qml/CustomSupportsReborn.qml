@@ -60,7 +60,7 @@ Item
     height: childrenRect.height
     
     
-    property var support_size: UM.ActiveTool.properties.getValue(supportSize)
+    property var support_size: UM.ActiveTool.properties.getValue("SupportSize")
     property int localwidth: 110
 
     function setSupportType(type)
@@ -211,11 +211,7 @@ Item
                 property bool needBorder: true
                 checkable:true
                 onClicked: setSupportType(SupportTypes.MODEL)
-                Binding{
-                    target:cylinderButton
-                    property: "checked"
-                    value: withActiveTool(function(tool) {return tool.supportType === SupportTypes.MODEL})
-                }
+                checked: UM.Controller.properties.getValue("SupportType") === SupportTypes.MODEL
                 //checked: withActiveTool(function(tool) {return tool.supportType}) === SupportTypes.MODEL
                 z: 1 // Depth position 
             }
@@ -299,7 +295,7 @@ Item
             width: localwidth
             height: UM.Theme.getSize("setting_control").height
             unit: "mm"
-            text: withActiveTool(function(tool) {return tool.supportSize})
+            text: UM.Controller.properties.getValue("SupportSize")
             validator: DoubleValidator
             {
                 decimals: 2
@@ -321,7 +317,7 @@ Item
             height: UM.Theme.getSize("setting_control").height
             unit: "mm"
             visible: !modelButton.checked
-            text: withActiveTool(function(tool) {return tool.supportSizeMax})
+            text: UM.Controller.properties.getValue("SupportSizeMax")
             validator: DoubleValidator
             {
                 decimals: 2
@@ -367,7 +363,7 @@ Item
             height: UM.Theme.getSize("setting_control").height
             unit: "mm"
             visible: tubeButton.checked
-            text: withActiveTool(function(tool) {return tool.supportSizeInner})
+            text: UM.Controller.properties.getValue("SupportSizeInner")
             validator: DoubleValidator
             {
                 decimals: 2
@@ -390,7 +386,7 @@ Item
             height: UM.Theme.getSize("setting_control").height
             unit: "°"
             visible: !modelButton.checked
-            text: withActiveTool(function(tool) {return tool.supportAngle})
+            text: UM.Controller.properties.getValue("SupportAngle")
             validator: IntValidator
             {
                 bottom: 0
