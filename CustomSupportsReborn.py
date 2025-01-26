@@ -63,6 +63,7 @@ import math
 import numpy
 import os.path
 import trimesh
+import logging
 from enum import Enum
 
 from typing import Optional, List
@@ -110,6 +111,21 @@ from UM.i18n import i18nCatalog
 
 DEBUG_MODE = True
 
+def log(level, message):
+    """Wrapper function for logging messages using Cura's Logger, but with debug mode so as not to spam you."""
+    if level == "d" and DEBUG_MODE:
+        Logger.log("d", message)
+    elif level == "i":
+        Logger.log("i", message)
+    elif level == "w":
+        Logger.log("w", message)
+    elif level == "e":
+        Logger.log("e", message)
+    elif level == "c":
+        Logger.log("c", message)
+    elif DEBUG_MODE:
+        Logger.log("w", f"Invalid log level: {level} for message {message}")
+
 SUPPORT_TYPE_CYLINDER = "cylinder"
 SUPPORT_TYPE_TUBE = "tube"
 SUPPORT_TYPE_CUBE = "cube"
@@ -134,7 +150,7 @@ class CustomSupportsReborn(Tool):
 
         self._catalog = i18nCatalog("customsupportsreborn")
 
-        self.setExposedProperties("SupportType", "SupportSize", "SupportSizeMax", "SupportSizeInner", "SupportAngle")
+        self.setExposedProperties("SupportType", "SupportSubtype", "SupportSize", "SupportSizeMax", "SupportSizeInner", "SupportAngle", "SupportYDirection", "AbutmentEqualizeHeights", "ModelScaleMain", "ModelOrient", "ModelMirror", "PanelRemoveAllText")
 
         self._supports_created: List[SceneNode] = []
         
@@ -307,7 +323,7 @@ class CustomSupportsReborn(Tool):
             node.setName(self._catalog.i18nc("nodeNames:model", "CustomSupportModel"))
         else:
             node.setName(self._catalog.i18nc("@errors:node_support_type"), "CustomSupportError")
-            Logger.log("w", "CustomSupportsReborn: Creating a node without a valid support_type")
+            self._logger.log("w", "CustomSupportsReborn: Creating a node without a valid support_type")
             
         node.setSelectable(True)
         
@@ -1197,7 +1213,8 @@ class CustomSupportsReborn(Tool):
         #Logger.log('d', 's_value : ' + str(s_value))        
         self._support_size = new_value
         self._preferences.setValue("customsupportsreborn/support_size", new_value)
-        self.propertyChanged.emit("supportSize")
+        log("d", f"_support_size being set to {new_value}")
+        self.propertyChanged.emit()
     
     supportSize = property(getSupportSize, setSupportSize)
 
@@ -1211,12 +1228,14 @@ class CustomSupportsReborn(Tool):
             return
 
         if new_value < 0:
+            log("i", "Tried to set SupportSizeMax to < 0")
             return
         
         #Logger.log('d', 's_value : ' + str(s_value))        
         self._support_size_max = new_value
         self._preferences.setValue("customsupportsreborn/support_size_max", new_value)
-        self.propertyChanged.emit("supportSizeMax")
+        log("d", f"_support_size_max being set to {new_value}")
+        self.propertyChanged.emit()
     
     supportSizeMax = property(getSupportSizeMax, setSupportSizeMax)
         
@@ -1237,7 +1256,8 @@ class CustomSupportsReborn(Tool):
         #Logger.log('d', 's_value : ' + str(s_value))        
         self._support_size_inner = new_value
         self._preferences.setValue("customsupportsreborn/support_size_inner", new_value)
-        self.propertyChanged.emit("supportSizeInner")
+        log("d", f"_support_size_inner being set to {new_value}")
+        self.propertyChanged.emit()
     
     supportSizeInner = property(getSupportSizeInner, setSupportSizeInner)
         
@@ -1256,7 +1276,8 @@ class CustomSupportsReborn(Tool):
         # Logger.log('d', 's_value : ' + str(s_value))        
         self._support_angle = new_value
         self._preferences.setValue("customsupportsreborn/support_angle", new_value)
-        self.propertyChanged.emit("supportAngle")
+        log("d", f"_support_angle being set to {new_value}")
+        self.propertyChanged.emit()
 
     supportAngle = property(getSupportAngle, setSupportAngle)
  
@@ -1265,7 +1286,8 @@ class CustomSupportsReborn(Tool):
     
     def setPanelRemoveAllText(self, new_text: str) -> None:
         self._panel_remove_all_text = str(new_text)
-        self.propertyChanged.emit("panelRemoveAllText")
+        log("d", f"_panel_remove_all_text being set to {new_text}")
+        self.propertyChanged.emit()
 
     panelRemoveAllText = property(getPanelRemoveAllText, setPanelRemoveAllText)
         
@@ -1274,9 +1296,9 @@ class CustomSupportsReborn(Tool):
     
     def setSupportType(self, new_type: str) -> None:
         self._support_type = new_type
-        # Logger.log('d', 'SType : ' + str(SType))   
+        log("d", f"_support_type being set to {new_type}")
         self._preferences.setValue("customsupportsreborn/support_type", new_type)
-        self.propertyChanged.emit("supportType")
+        self.propertyChanged.emit()
 
     supportType = property(getSupportType, setSupportType)
  
@@ -1288,11 +1310,12 @@ class CustomSupportsReborn(Tool):
         self._support_subtype = new_type
         # Logger.log('d', 'Get SubType : ' + str(SubType))   
         self._preferences.setValue("customsupportsreborn/support_subtype", new_type)
-        self.propertyChanged.emit("supportSubtype")
+        log("d", f"_support_subtype being set to {new_type}")
+        self.propertyChanged.emit()
 
     supportSubtype = property(getSupportSubtype, setSupportSubtype)
         
-    def getsupportYDirection(self) -> bool:
+    def getSupportYDirection(self) -> bool:
         return self._support_y_direction
     
     def setSupportYDirection(self, YDirection: bool) -> None:
@@ -1303,9 +1326,10 @@ class CustomSupportsReborn(Tool):
         
         self._support_y_direction = new_value
         self._preferences.setValue("customsupportsreborn/support_y_direction", new_value)
-        self.propertyChanged.emit("supportYDirection")
+        log("d", f"_support_y_direction being set to {new_value}")
+        self.propertyChanged.emit()
 
-    supportYDirection = property(getsupportYDirection, setSupportYDirection)
+    supportYDirection = property(getSupportYDirection, setSupportYDirection)
  
     def getAbutmentEqualizeHeights(self) -> bool:
         return self._abutment_equalize_heights
@@ -1318,7 +1342,8 @@ class CustomSupportsReborn(Tool):
 
         self._abutment_equalize_heights = new_value
         self._preferences.setValue("customsupportsreborn/abutment_equalize_heights", new_value)
-        self.propertyChanged.emit("abutmentEqualizeHeights")
+        log("d", f"_abutment_equalize_heights being set to {new_value}")
+        self.propertyChanged.emit()
 
     abutmentEqualizeHeights = property(getAbutmentEqualizeHeights, setAbutmentEqualizeHeights)
  
@@ -1333,7 +1358,8 @@ class CustomSupportsReborn(Tool):
 
         self._model_scale_main = new_value
         self._preferences.setValue("customsupportsreborn/model_scale_main", new_value)
-        self.propertyChanged.emit("modelScaleMain")
+        log("d", f"_model_scale_main being set to {new_value}")
+        self.propertyChanged.emit()
 
     modelScaleMain = property(getModelScaleMain, setModelScaleMain)
         
@@ -1348,7 +1374,8 @@ class CustomSupportsReborn(Tool):
 
         self._model_orient = new_value
         self._preferences.setValue("customsupportsreborn/model_orient", new_value)
-        self.propertyChanged.emit("modelOrient")
+        log("d", f"_model_orient being set to {new_value}")
+        self.propertyChanged.emit()
     
     modelOrient = property(getModelOrient, setModelOrient)
     
@@ -1363,6 +1390,7 @@ class CustomSupportsReborn(Tool):
 
         self._model_mirror = new_value
         self._preferences.setValue("customsupportsreborn/model_mirror", new_value)
-        self.propertyChanged.emit("modelMirror")
+        log("d", f"_model_mirror being set to {new_value}")
+        self.propertyChanged.emit()
 
     modelMirror = property(getModelMirror, setModelMirror)

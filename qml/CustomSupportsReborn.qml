@@ -38,6 +38,21 @@ Item
 
     width: childrenRect.width
     height: childrenRect.height
+
+    Component.onCompleted: {
+        // Pretty sure the buttons need their checked values done too. Can't hurt anyway. I hope.
+        cylinderButton.checked = UM.Controller.properties.getValue("SupportType") === supportTypeCylinder
+        tubeButton.checked = UM.Controller.properties.getValue("SupportType") === supportTypeTube
+        cubeButton.checked = UM.Controller.properties.getValue("SupportType") === supportTypeCube
+        abutmentButton.checked = UM.Controller.properties.getValue("SupportType") === supportTypeAbutment
+        lineButton.checked = UM.Controller.properties.getValue("SupportType") === supportTypeLine
+        modelButton.checked = UM.Controller.properties.getValue("SupportType") === supportTypeModel
+
+        supportSizeTextField.text = UM.Controller.properties.getValue("SupportSize")
+        supportSizeMaxTextField.text = UM.Controller.properties.getValue("SupportSizeMax")
+        supportSizeInnerTextField.text = UM.Controller.properties.getValue("SupportSizeInner")
+        supportAngleTextField.text = UM.Controller.properties.getValue("SupportAngle")
+    }
     
     
     property var support_size: UM.Controller.properties.getValue("SupportSize")
@@ -52,7 +67,7 @@ Item
         abutmentButton.checked = type === supportTypeAbutment
         lineButton.checked = type === supportTypeLine
         modelButton.checked = type === supportTypeModel
-        withActiveTool(function(tool) {tool.supportType = type})
+        UM.Controller.setProperty("SupportType", type)
     }
     
     Column
@@ -79,12 +94,7 @@ Item
                 property bool needBorder: true
                 checkable:true
                 onClicked: setSupportType(supportTypeCylinder)
-                Binding{
-                    target:cylinderButton
-                    property: "checked"
-                    value: withActiveTool(function(tool) {return tool.supportType === supportTypeCylinder})
-                }
-                //checked: withActiveTool(function(tool) {return tool.supportType}) === supportTypeCylinder
+                //checked: UM.Controller.properties.getValue("SupportType") === supportTypeCylinder
                 z: 3 // Depth position 
             }
 
@@ -100,12 +110,7 @@ Item
                 property bool needBorder: true
                 checkable:true
                 onClicked: setSupportType(supportTypeTube)
-                Binding{
-                    target:tubeButton
-                    property: "checked"
-                    value: withActiveTool(function(tool) {return tool.supportType === supportTypeTube})
-                }
-                //checked: withActiveTool(function(tool) {return tool.supportType}) === supportTypeTube
+                //checked: UM.Controller.properties.getValue("SupportType") === supportTypeTube
                 z: 2 // Depth position 
             }
             
@@ -121,12 +126,7 @@ Item
                 property bool needBorder: true
                 checkable: true
                 onClicked: setSupportType(supportTypeCube)
-                Binding{
-                    target:cubeButton
-                    property: "checked"
-                    value: withActiveTool(function(tool) {return tool.supportType === supportTypeCube})
-                }
-                //checked: withActiveTool(function(tool) {return tool.supportType}) === supportTypeCube
+                //checked: UM.Controller.properties.getValue("SupportType") === supportTypeCube
                 z: 1 // Depth position 
             }
 
@@ -149,12 +149,7 @@ Item
                 property bool needBorder: true
                 checkable: true
                 onClicked: setSupportType(supportTypeAbutment)
-                Binding{
-                    target:abutmentButton
-                    property: "checked"
-                    value: withActiveTool(function(tool) {return tool.supportType === supportTypeAbutment})
-                }
-                //checked: withActiveTool(function(tool) {return tool.supportType}) === supportTypeAbutment
+                //checked: UM.Controller.properties.getValue("SupportType") === supportTypeAbutment
                 z: 3 // Depth position 
             }
 
@@ -170,12 +165,7 @@ Item
                 property bool needBorder: true
                 checkable:true
                 onClicked: setSupportType(supportTypeLine)
-                Binding{
-                    target:lineButton
-                    property: "checked"
-                    value: withActiveTool(function(tool) {return tool.supportType === supportTypeLine})
-                }
-                //checked: withActiveTool(function(tool) {return tool.supportType}) === supportTypeLine
+                //checked: UM.Controller.properties.getValue("SupportType") === supportTypeLine
                 z: 2 // Depth position 
             }
 
@@ -191,8 +181,7 @@ Item
                 property bool needBorder: true
                 checkable:true
                 onClicked: setSupportType(supportTypeModel)
-                checked: UM.Controller.properties.getValue("SupportType") === supportTypeModel
-                //checked: withActiveTool(function(tool) {return tool.supportType}) === supportTypeModel
+                //checked: UM.Controller.properties.getValue("SupportType") === supportTypeModel
                 z: 1 // Depth position 
             }
         }
@@ -275,7 +264,7 @@ Item
             width: localwidth
             height: UM.Theme.getSize("setting_control").height
             unit: "mm"
-            text: UM.Controller.properties.getValue("SupportSize")
+            //text: UM.Controller.properties.getValue("SupportSize")
             validator: DoubleValidator
             {
                 decimals: 2
@@ -297,7 +286,7 @@ Item
             height: UM.Theme.getSize("setting_control").height
             unit: "mm"
             visible: !modelButton.checked
-            text: UM.Controller.properties.getValue("SupportSizeMax")
+            //text: UM.Controller.properties.getValue("SupportSizeMax")
             validator: DoubleValidator
             {
                 decimals: 2
@@ -343,7 +332,7 @@ Item
             height: UM.Theme.getSize("setting_control").height
             unit: "mm"
             visible: tubeButton.checked
-            text: UM.Controller.properties.getValue("SupportSizeInner")
+            //text: UM.Controller.properties.getValue("SupportSizeInner")
             validator: DoubleValidator
             {
                 decimals: 2
@@ -366,7 +355,7 @@ Item
             height: UM.Theme.getSize("setting_control").height
             unit: "°"
             visible: !modelButton.checked
-            text: UM.Controller.properties.getValue("SupportAngle")
+            //text: UM.Controller.properties.getValue("SupportAngle")
             validator: IntValidator
             {
                 bottom: 0
@@ -384,7 +373,7 @@ Item
     {
         id: baseCheckBox
         width: childrenRect.width
-        height: !modelButton.checked && !abutmentButton.checked && !cylinderButton.checked ?  0 : cylinderButton.checked ? UM.Theme.getSize("setting_control").height : abutmentButton.checked ? (UM.Theme.getSize("setting_control").height*2+UM.Theme.getSize("default_margin").height): childrenRect.height
+        height: !modelButton.checked && !abutmentButton.checked ? 0 : abutmentButton.checked ? (UM.Theme.getSize("setting_control").height*2+UM.Theme.getSize("default_margin").height): childrenRect.height
         anchors.leftMargin: UM.Theme.getSize("default_margin").width
         anchors.top: textfields.bottom
         anchors.topMargin: UM.Theme.getSize("default_margin").height
@@ -475,6 +464,6 @@ Item
         width: UM.Theme.getSize("setting_control").width
         height: UM.Theme.getSize("setting_control").height        
         text: catalog.i18nc("panel:remove_all", "Remove All")
-        onClicked: withActiveTool(function(tool) {tool.removeAllSupportMesh()})
+        onClicked: UM.Controller.triggerAction("removeAllSupportMesh")
     }
 }
