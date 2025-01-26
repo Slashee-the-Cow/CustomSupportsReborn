@@ -49,11 +49,12 @@
 # V1.0.0 - Initial release.
 #   Reverted everything to v2.8.0 manually as the version in the master branch seems to contain some "work in progress" stuff.
 #   Renamed everything. Including internally so it doesn't compete with 5@xes' verison if you still have that installed.
-#   Futzed around with the translation system and ended up with basically the same thing. 
+#   Futzed around with the translation system and ended up with basically the same thing. If someone wants to translate it, get in touch!
 #   Removed support for Qt 5 and bumped minimum Cura version to 5.0 so I'm not doing things twice and can use newer Python features if I need.
 #   Cleaned up the code a little bit and tried to give some variables more readable names.
 #   Changed the icon to illustrate it does more than cylinders. Now it looks like it does rockets.
 #   Renamed "Freeform" to "Model" and "Custom" to "Line" and swapped their positions.
+#   Input validation in the text fields! Resetting if you put in something invalid! Preventing bugs from conflicting settings!
 
 from PyQt6.QtCore import Qt, QTimer, QObject, QVariant, pyqtProperty
 from PyQt6.QtQml import qmlRegisterType
@@ -300,7 +301,7 @@ class CustomSupportsReborn(Tool):
                 self._createSupportMesh(picked_node, picked_position,picked_position_b)
 
 
-    def _createSupportMesh(self, parent: CuraSceneNode, position: Vector , position2: Vector):
+    def _createSupportMesh(self, parent: CuraSceneNode, position_start: Vector , position_end: Vector):
         node = CuraSceneNode()
         EName = parent.getName()
 
@@ -326,41 +327,43 @@ class CustomSupportsReborn(Tool):
             self._logger.log("w", "CustomSupportsReborn: Creating a node without a valid support_type")
             
         node.setSelectable(True)
+
+        # Prevent big circus tents.
+        use_support_angle = self._support_angle if self._support_size != self._support_size_max else 0
         
         # long=Support Height
-        self._long=position.y
+        self._length=position_start.y
         # Logger.log("d", "Long Support= %s", str(self._long))
         
         # Limitation for support height to Node Height
         # For Cube/Cylinder/Tube
         # Test with 0.5 because the precision on the clic poisition is not very thight 
-        if self._long >= (self._nodeHeight-0.5) :
+        if self._length >= (self._nodeHeight-0.5) :
             # additionale length
-            self._Sup = 0
+            self._top_added_height = 0
         else :
             if self._support_type == SUPPORT_TYPE_CUBE:
-                self._Sup = self._support_size*0.5
+                self._top_added_height = self._support_size*0.5
             elif self._support_type == SUPPORT_TYPE_ABUTMENT:
-                self._Sup = self._support_size
+                self._top_added_height = self._support_size
             else :
-                self._Sup = self._support_size*0.1
+                self._top_added_height = self._support_size*0.1
                 
         # Logger.log("d", "Additional Long Support = %s", str(self._long+self._Sup))    
             
         if self._support_type == SUPPORT_TYPE_CYLINDER:
             # Cylinder creation Diameter , Maximum diameter , Increment angle 10°, length , top Additional Height, Angle of the support
-            mesh = self._createCylinder(self._support_size,self._support_size_max,10,self._long,self._Sup,self._support_angle)
+            mesh = self._createCylinder(self._support_size, self._support_size_max, 10, self._length, self._top_added_height, use_support_angle)
         elif self._support_type == SUPPORT_TYPE_TUBE:
             # Tube creation Diameter ,Maximum diameter , Diameter Int, Increment angle 10°, length, top Additional Height , Angle of the support
-            mesh =  self._createTube(self._support_size,self._support_size_max,self._support_size_inner,10,self._long,self._Sup,self._support_angle)
+            mesh =  self._createTube(self._support_size, self._support_size_max, self._support_size_inner, 10, self._length, self._top_added_height, use_support_angle)
         elif self._support_type == SUPPORT_TYPE_CUBE:
             # Cube creation Size,Maximum Size , length , top Additional Height, Angle of the support
-            mesh =  self._createCube(self._support_size,self._support_size_max,self._long,self._Sup,self._support_angle)
+            mesh =  self._createCube(self._support_size, self._support_size_max, self._length, self._top_added_height, use_support_angle)
         elif self._support_type == SUPPORT_TYPE_MODEL:
             # Cube creation Size , length
             mesh = MeshBuilder()  
-            MName = self._support_subtype + ".stl"
-            model_definition_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "models", MName)
+            model_definition_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "models", self._support_subtype + ".stl")
             # Logger.log('d', 'Model_definition_path : ' + str(model_definition_path)) 
             load_mesh = trimesh.load(model_definition_path)
             origin = [0, 0, 0]
@@ -370,10 +373,10 @@ class CustomSupportsReborn(Tool):
             
             # Solution must be tested ( other solution just on the X Axis)
             if self._model_scale_main :
-                if (self._long * 0.5 ) < self._support_size :
+                if (self._length * 0.5 ) < self._support_size :
                     Scale = self._support_size
                 else :
-                    Scale = self._long * 0.5
+                    Scale = self._length * 0.5
                 load_mesh.apply_transform(trimesh.transformations.scale_matrix(Scale, origin, DirX))
                 load_mesh.apply_transform(trimesh.transformations.scale_matrix(Scale, origin, DirY))
             else :
@@ -382,10 +385,10 @@ class CustomSupportsReborn(Tool):
                 
             # load_mesh.apply_transform(trimesh.transformations.scale_matrix(self._UseSize, origin, DirY))
  
-            load_mesh.apply_transform(trimesh.transformations.scale_matrix(self._long, origin, DirZ)) 
+            load_mesh.apply_transform(trimesh.transformations.scale_matrix(self._length, origin, DirZ)) 
             
             # Logger.log('d', "Info Orient Support --> " + str(self._OrientSupport))
-            if self._model_orient == True :
+            if self._model_orient:
                 # This function can be triggered in the middle of a machine change, so do not proceed if the machine change has not done yet.
                 global_container_stack = CuraApplication.getInstance().getGlobalContainerStack()
                 adhesion_key = "adhesion_type"
@@ -395,7 +398,7 @@ class CustomSupportsReborn(Tool):
                     adhesion_options = global_container_stack.getProperty(adhesion_key, "options")
 
                     global_container_stack.setProperty("adhesion_type", "value", "skirt")
-                    Logger.log('d', "Info adhesion_type --> " + str(adhesion_value)) 
+                    log('d', "Info adhesion_type --> " + str(adhesion_value)) 
                     if not self._model_hide_message :
                         try:
                             translated_skirt_label = adhesion_options["skirt"]
@@ -407,48 +410,48 @@ class CustomSupportsReborn(Tool):
                         Message(text = warning_string, title = self._catalog.i18nc("model_warning_dialog:title", "WARNING: Custom Supports Reborn").show())
                         self._model_hide_message = True
                     # Define temporary adhesion_type=skirt to force boundary calculation ?
-                _angle = self.defineAngle(EName,position)
-                if self._support_y_direction == True :
+                _angle = self.defineAngle(EName,position_start)
+                if self._support_y_direction:
                     _angle = self.mainAngle(_angle)
-                Logger.log('d', 'Angle : ' + str(_angle))
+                log('d', 'Angle : ' + str(_angle))
                 load_mesh.apply_transform(trimesh.transformations.rotation_matrix(_angle, [0, 0, 1]))
             
-            elif self._support_y_direction == True :
+            elif self._support_y_direction:
                 load_mesh.apply_transform(trimesh.transformations.rotation_matrix(math.radians(90), [0, 0, 1]))
 
-            if self._model_mirror == True and self._model_orient == False :   
+            if self._model_mirror and not self._model_orient:
                 load_mesh.apply_transform(trimesh.transformations.rotation_matrix(math.radians(180), [0, 0, 1]))
                 
             mesh =  self._toMeshData(load_mesh)
             
         elif self._support_type == SUPPORT_TYPE_ABUTMENT:
             # Abutement creation Size , length , top
-            if self._abutment_equalize_heights == True :
+            if self._abutment_equalize_heights :
                 # Logger.log('d', 'SHeights : ' + str(self._SHeights)) 
                 if self._support_heights==0 :
-                    self._support_heights=position.y
-                    self._SSup=self._Sup
+                    self._support_heights=position_start.y
+                    self._SSup=self._top_added_height
 
-                self._top=self._SSup+(self._support_heights-position.y)
+                self._top=self._SSup+(self._support_heights-position_start.y)
                 
             else:
-                self._top=self._Sup
+                self._top=self._top_added_height
                 self._support_heights=0
             
             # 
-            Logger.log('d', 'top : ' + str(self._top))
+            log('d', 'Abutment top : ' + str(self._top))
             # Logger.log('d', 'MaxSize : ' + str(self._MaxSize))
             
-            mesh =  self._createAbutment(self._support_size,self._support_size_max,self._long,self._top,self._support_angle,self._support_y_direction)
+            mesh =  self._createAbutment(self._support_size,self._support_size_max,self._length,self._top,use_support_angle,self._support_y_direction)
         else:           
             # Custom creation Size , P1 as vector P2 as vector
             # Get support_interface_height as extra distance 
             extruder_stack = self._application.getExtruderManager().getActiveExtruderStacks()[0]
-            if self._Sup == 0 :
+            if self._top_added_height == 0 :
                 extra_top = 0
             else :
                 extra_top=extruder_stack.getProperty("support_interface_height", "value")            
-            mesh =  self._createLine(self._support_size,self._support_size_max,position,position2,self._support_angle,extra_top)
+            mesh =  self._createLine(self._support_size,self._support_size_max,position_start,position_end,use_support_angle,extra_top)
 
         # Mesh Model are loaded via trimesh doesn't aheve the Build method
         if self._support_type != 'model':
@@ -500,9 +503,9 @@ class CustomSupportsReborn(Tool):
                     Logger.log("w", "Setting support_type does not have 'everywhere' as an option")
             else:
                 translated_support_placement = "Everywhere"
-                Logger.log("w", "Setting support_type does not have any options defined") # Log if no options are defined
+                log("w", "Setting support_type does not have any options defined") # Log if no options are defined
             Message(text = f"{self._catalog.i18nc('support_placement_warning:dialog:start', 'Had to change setting')} {support_placement_label} {self._catalog.i18nc('support_placement_warning:middle', 'to')} {translated_support_placement} {self._catalog.i18nc('support_placement_warning:end', 'for support to work.')}", title = self._catalog.i18nc("support_placement_warning:title", "WARNING: Custom Supports Reborn")).show()
-            Logger.log('d', 'Support_type different from everywhere : ' + str(support_placement))
+            log('d', 'Support_type different from everywhere : ' + str(support_placement))
             # Define support_type=everywhere
             global_container_stack.setProperty("support_type", "value", 'everywhere')
             
@@ -511,7 +514,7 @@ class CustomSupportsReborn(Tool):
         op.addOperation(AddSceneNodeOperation(node, self._controller.getScene().getRoot()))
         op.addOperation(SetParentOperation(node, parent))
         op.push()
-        node.setPosition(position, CuraSceneNode.TransformSpace.World)
+        node.setPosition(position_start, CuraSceneNode.TransformSpace.World)
         self._supports_created.append(node)
         self._panel_remove_all_text = self._catalog.i18nc("panel:remove_last", "Remove Last")
         self.propertyChanged.emit()
@@ -929,11 +932,11 @@ class CustomSupportsReborn(Tool):
         return mesh
  
    # Tube creation
-    def _createTube(self, size, maxs, isize, nb , lg, sup ,dep):
+    def _createTube(self, support_size, maxs, isize, nb , lg, sup ,dep):
         # Logger.log('d', 'isize : ' + str(isize)) 
         mesh = MeshBuilder()
         # Per-vertex normals require duplication of vertices
-        r = size / 2
+        r = support_size / 2
         ri = isize / 2
         rm = maxs / 2
         l = -lg

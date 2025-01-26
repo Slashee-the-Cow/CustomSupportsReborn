@@ -39,6 +39,11 @@ Item
     width: childrenRect.width
     height: childrenRect.height
 
+    property real supportSizeValue: 0
+    property real supportSizeMaxValue: 0
+    property real supportSizeInnerValue: 0
+    property real supportAngleValue: 0
+
     Component.onCompleted: {
         // Pretty sure the buttons need their checked values done too. Can't hurt anyway. I hope.
         cylinderButton.checked = UM.Controller.properties.getValue("SupportType") === supportTypeCylinder
@@ -48,14 +53,22 @@ Item
         lineButton.checked = UM.Controller.properties.getValue("SupportType") === supportTypeLine
         modelButton.checked = UM.Controller.properties.getValue("SupportType") === supportTypeModel
 
-        supportSizeTextField.text = UM.Controller.properties.getValue("SupportSize")
-        supportSizeMaxTextField.text = UM.Controller.properties.getValue("SupportSizeMax")
-        supportSizeInnerTextField.text = UM.Controller.properties.getValue("SupportSizeInner")
-        supportAngleTextField.text = UM.Controller.properties.getValue("SupportAngle")
+        supportSizeMaxValue = UM.Controller.properties.getValue("SupportSizeMax")
+        supportSizeValue = UM.Controller.properties.getValue("SupportSize")
+        supportSizeTextField.validator.top = supportSizeMaxValue
+        supportSizeInnerValue = UM.Controller.properties.getValue("SupportSizeInner")
+        supportSizeInnerTextField.validator.top = supportSizeValue - 0.01
+        supportAngleValue = UM.Controller.properties.getValue("SupportAngle")
+
+        supportYDirectionCheckbox.checked = UM.Controller.properties.getValue("SupportYDirection")
+        modelMirrorCheckbox.checked = UM.Controller.properties.getValue("ModelMirror")
+        modelOrientCheckbox.checked = UM.Controller.properties.getValue("ModelOrient")
+        modelScaleMainCheckbox.checked = UM.Controller.properties.getValue("ModelScaleMain")
+        abutmentEqualizeHeightsCheckbox.checked = UM.Controller.properties.getValue("AbutmentEqualizeHeights")
     }
     
     
-    property var support_size: UM.Controller.properties.getValue("SupportSize")
+    //property var support_size: UM.Controller.properties.getValue("SupportSize")
     property int localwidth: 110
 
     function setSupportType(type)
@@ -89,7 +102,7 @@ Item
                 toolItem: UM.ColorImage
                 {
                     source: Qt.resolvedUrl("type_cylinder.svg")
-                    color: "red"
+                    color: UM.Theme.getColor("icon")
                 }
                 property bool needBorder: true
                 checkable:true
@@ -261,43 +274,113 @@ Item
         UM.TextFieldWithUnit
         {
             id: supportSizeTextField
+            property string displaySupportSize: "0"
             width: localwidth
             height: UM.Theme.getSize("setting_control").height
             unit: "mm"
-            //text: UM.Controller.properties.getValue("SupportSize")
+            text: displaySupportSize
+            Connections{
+                target: root
+                function onSupportSizeMaxValueChanged() {
+                    supportSizeTextField.validator.top = root.supportSizeMaxValue;
+                    if(root.supportSizeValue > root.supportSizeMaxValue){
+                        root.supportSizeValue = root.supportSizeMaxValue;
+                        supportSizeTextField.displaySupportSize = root.supportSizeValue.toString();
+                        UM.Controller.setProperty("SupportSize", root.supportSizeValue)
+                    }
+                }
+            }
+            Component.onCompleted: {
+                displaySupportSize = root.supportSizeValue.toString()
+            }
+
             validator: DoubleValidator
             {
                 decimals: 2
                 bottom: 0.1
                 locale: "en_US"
+                notation: DoubleValidator.StandardNotation
             }
 
-            onEditingFinished:
+            onFocusChanged:
             {
-                var modified_text = text.replace(",", ".") // User convenience. We use dots for decimal values
-                withActiveTool(function(tool) {tool.supportSize = modified_text})
+                if(focus){
+                    return;
+                }
+                var modified_text = supportSizeTextField.text.replace(",", ".") // User convenience. We use dots for decimal values
+                if(modified_text === ""){
+                    displaySupportSize = ""
+                    displaySupportSize = root.supportSizeValue.toString();
+                } else {
+                    var text_as_num = parseFloat(modified_text)
+                    if (isNaN(text_as_num)){
+                        displaySupportSize = ""
+                        displaySupportSize = root.supportSizeValue.toString()
+                        return
+                    } else if(text_as_num == 0){
+                        displaySupportSize = ""
+                        displaySupportSize = root.supportSizeValue.toString()
+                        return
+                    } else if(text_as_num > root.supportSizeMaxValue) {
+                        displaySupportSize = ""
+                        displaySupportSize = root.supportSizeMaxValue.toString()
+                        text_as_num = root.supportSizeMaxValue
+                    } else {
+                        root.supportSizeValue = text_as_num;
+                        UM.Controller.setProperty("SupportSize", text_as_num);
+                        displaySupportSize = text_as_num.toString();
+                    }
+                }
             }
         }
 
         UM.TextFieldWithUnit
         {
             id: supportSizeMaxTextField
+            property string displaySupportSizeMax: "0"
             width: localwidth
             height: UM.Theme.getSize("setting_control").height
             unit: "mm"
             visible: !modelButton.checked
-            //text: UM.Controller.properties.getValue("SupportSizeMax")
+            text: displaySupportSizeMax
+            Component.onCompleted: {
+                displaySupportSizeMax = root.supportSizeMaxValue.toString()
+            }
+
             validator: DoubleValidator
             {
                 decimals: 2
-                bottom: 0
+                bottom: 0.01
                 locale: "en_US"
+                notation: DoubleValidator.StandardNotation
             }
 
-            onEditingFinished:
+            onFocusChanged:
             {
-                var modified_text = text.replace(",", ".") // User convenience. We use dots for decimal values
-                withActiveTool(function(bool) {tool.supportSizeMax = modified_text})
+                if(focus){
+                    return;
+                }
+                console.log("supportSizeMaxTextField onEditingFinish")
+                var modified_text = supportSizeMaxTextField.text.replace(",", ".") // User convenience. We use dots for decimal values
+                if (modified_text === ""){
+                    displaySupportSizeMax = ""
+                    displaySupportSizeMax = root.supportSizeMaxValue.toString();
+                    return
+                } else {}
+                    var text_as_num = parseFloat(modified_text)
+                    if (isNaN(text_as_num)){
+                        displaySupportSizeMax = ""
+                        displaySupportSizeMax = root.supportSizeMaxValue.toString();
+                        return
+                    } else if(text_as_num == 0) {
+                        displaySupportSizeMax = ""
+                        displaySupportSizeMax = root.supportSizeMaxValue.toString()
+                        return
+                    } {
+                        root.supportSizeMaxValue = text_as_num
+                        UM.Controller.setProperty("SupportSizeMax", text_as_num)
+                        displaySupportSizeMax = text_as_num.toString()
+                    }
             }
         }
 
@@ -317,54 +400,122 @@ Item
             width: localwidth
             height: UM.Theme.getSize("setting_control").height
             visible: modelButton.checked
-            Component.onCompleted: currentIndex = find(withActiveTool(function(tool) {return tool.supportSubtype}))
+            Component.onCompleted: currentIndex = find(UM.Controller.properties.getValue("SupportSubtype"))
             
             onCurrentIndexChanged: 
             { 
-                withActiveTool(function(tool) {tool.supportSubtype = cbItems.get(currentIndex).text})
+                UM.Controller.setProperty("SupportSubtype", cbItems.get(currentIndex).text)
             }
         }    
                 
         UM.TextFieldWithUnit
         {
             id: supportSizeInnerTextField
+            property string displaySupportSizeInner: "0"
             width: localwidth
             height: UM.Theme.getSize("setting_control").height
             unit: "mm"
             visible: tubeButton.checked
-            //text: UM.Controller.properties.getValue("SupportSizeInner")
+            text: displaySupportSizeInner
+            
+            Connections{
+                target: root
+                function onSupportSizeValueChanged() {
+                    supportSizeInnerTextField.validator.top = root.supportSizeValue - 0.01
+                    if(root.supportSizeInnerValue >= root.supportSizeValue){
+                        root.supportSizeInnerValue = root.supportSizeValue - 0.01;
+                        supportSizeInnerTextField.displaySupportSizeInner = root.supportSizeInnerValue.toString();
+                        UM.Controller.setProperty("SupportSizeInner", root.supportSizeInnerValue)
+                    }
+                }
+            }
+
+            Component.onCompleted: {
+                displaySupportSizeInner = root.supportSizeInnerValue.toString()
+            }
             validator: DoubleValidator
             {
                 decimals: 2
-                top: support_size
+                top: 10
                 bottom: 0.1
                 locale: "en_US"
+                notation: DoubleValidator.StandardNotation
             }
 
-            onEditingFinished:
+            onFocusChanged:
             {
-                var modified_text = text.replace(",", ".") // User convenience. We use dots for decimal values
-                withActiveTool(function(tool) {tool.supportSizeInner = modified_text})
+                if(focus){
+                    return;
+                }
+                var modified_text = supportSizeInnerTextField.text.replace(",", ".") // User convenience. We use dots for decimal values
+                if(modified_text === ""){
+                    displaySupportSizeInner = ""
+                    displaySupportSizeInner = root.supportSizeInnerValue.toString()
+                    return
+                } else {
+                    var text_as_num = parseFloat(modified_text)
+                    if(isNaN(text_as_num)){
+                        displaySupportSizeInner = ""
+                        displaySupportSize = root.supportSizeInnerValue.toString()
+                        return
+                    } else {
+                        if(text_as_num == 0){
+                            displaySupportSizeInner = ""
+                            displaySupportSizeInner = root.supportSizeInnerValue.toString()
+                            return
+                        } else if(text_as_num > root.supportSizeValue - 0.01){
+                            displaySupportSizeInner = ""
+                            text_as_num = root.supportSizeValue - 0.01
+                        }
+                        root.supportSizeInnerValue = text_as_num
+                        UM.Controller.setProperty("SupportSizeInner", text_as_num)
+                        displaySupportSizeInner = text_as_num.toString()
+                    }
+                }
             }
         }
         
         UM.TextFieldWithUnit
         {
             id: supportAngleTextField
+            property string displaySupportAngle: "0"
+
             width: localwidth
             height: UM.Theme.getSize("setting_control").height
             unit: "°"
             visible: !modelButton.checked
-            //text: UM.Controller.properties.getValue("SupportAngle")
+            text: displaySupportAngle
+
+            Component.onCompleted:{
+                displaySupportAngle = root.supportAngleValue.toString()
+            }
+
             validator: IntValidator
             {
                 bottom: 0
+                top: 89
             }
 
-            onEditingFinished:
+            onFocusChanged:
             {
-                var modified_text = text.replace(",", ".") // User convenience. We use dots for decimal values
-                withActiveTool(function(tool) {tool.supportAngle = modified_text})
+                if(focus){
+                    return;
+                }
+                var modified_text = supportAngleTextField.text.replace(",", ".") // User convenience. We use dots for decimal values
+                if (modified_text === ""){
+                    displaySupportAngle = ""
+                    displaySupportAngle = root.supportAngleValue.toString()
+                } else {
+                    var text_as_num = parseFloat(modified_text)
+                    if(isNaN(text_as_num)){
+                        displaySupportAngle = ""
+                        displaySupportAngle = root.supportAngleValue.toString()
+                    } else {
+                        root.supportAngleValue = text_as_num
+                        UM.Controller.setProperty("SupportAngle", text_as_num)
+                        displaySupportAngle = text_as_num.toString()
+                    }
+                }
             }
         }
     }
@@ -387,8 +538,8 @@ Item
             text: !modelOrientCheckbox.checked || abutmentButton.checked ? catalog.i18nc("panel:set_on_y", "Set on Y Direction") : catalog.i18nc("panel:set_on_main", "Set on Main Direction")
             visible: abutmentButton.checked || modelButton.checked 
 
-            checked: withActiveTool(function(tool) {return tool.supportYDirection})
-            onClicked: withActiveTool(function(tool) {tool.supportYDirection = checked})
+            //checked: withActiveTool(function(tool) {return tool.supportYDirection})
+            onClicked: UM.Controller.setProperty("SupportYDirection", checked)
         }
         
         UM.CheckBox
@@ -397,11 +548,11 @@ Item
             anchors.top: supportYDirectionCheckbox.bottom
             anchors.topMargin: UM.Theme.getSize("default_margin").height
             anchors.left: parent.left
-            text: catalog.i18nc("panel:model_mirror", "Rotate 180")
+            text: catalog.i18nc("panel:model_mirror", "Rotate 180°")
             visible: modelButton.checked && !modelOrientCheckbox.checked
 
-            checked: withActiveTool(function(tool) {return tool.modelMirror})
-            onClicked: withActiveTool(function(tool) {tool.modelMirror = checked})
+            //checked: withActiveTool(function(tool) {return tool.modelMirror})
+            onClicked: UM.Controller.setProperty("ModelMirror", checked)
             
         }        
         UM.CheckBox
@@ -413,8 +564,8 @@ Item
             text: catalog.i18nc("panel:model_auto_orientate", "Auto Orientate")
             visible: modelButton.checked
 
-            checked: withActiveTool(function(tool) {return tool.modelOrient})
-            onClicked: withActiveTool(function(tool) {tool.modelOrient = checked})
+            //checked: withActiveTool(function(tool) {return tool.modelOrient})
+            onClicked: UM.Controller.setProperty("ModelOrient", checked)
             
         }    
         UM.CheckBox
@@ -426,8 +577,8 @@ Item
             text: catalog.i18nc("panel:model_scale_main", "Scale Main Direction")
             visible: modelButton.checked
 
-            checked: withActiveTool(function(tool) {return tool.modelScaleMain})
-            onClicked: withActiveTool(function(tool) {tool.modelScaleMain = checked})
+            //checked: withActiveTool(function(tool) {return tool.modelScaleMain})
+            onClicked: UM.Controller.setProperty("ModelScaleMain", checked)
         }    
         UM.CheckBox
         {
@@ -438,8 +589,8 @@ Item
             text: catalog.i18nc("panel:abutment_equalize_heights", "Equalize Heights")
             visible: abutmentButton.checked
 
-            checked: withActiveTool(function(tool) {return abutmentEqualizeHeights})
-            onClicked: withActiveTool(function(tool) {abutmentEqualizeHeights = checked})
+            //checked: withActiveTool(function(tool) {return abutmentEqualizeHeights})
+            onClicked: UM.Controller.setProperty("AbutmentEqualizeHeights", checked)
         }
         
 
