@@ -64,8 +64,6 @@ import math
 import numpy
 import os.path
 import trimesh
-import logging
-from enum import Enum
 
 from typing import Optional, List
 
@@ -110,7 +108,7 @@ from UM.i18n import i18nCatalog
 #if i18n_catalog.hasTranslationLoaded():
 #    Logger.log("i", "Custom Supports Reborn translation loaded")
 
-DEBUG_MODE = True
+DEBUG_MODE = False
 
 def log(level, message):
     """Wrapper function for logging messages using Cura's Logger, but with debug mode so as not to spam you."""
@@ -303,7 +301,7 @@ class CustomSupportsReborn(Tool):
 
     def _createSupportMesh(self, parent: CuraSceneNode, position_start: Vector , position_end: Vector):
         node = CuraSceneNode()
-        EName = parent.getName()
+        node_name = parent.getName()
 
         node_bounds = parent.getBoundingBox()
         self._nodeHeight = node_bounds.height
@@ -410,7 +408,7 @@ class CustomSupportsReborn(Tool):
                         Message(text = warning_string, title = self._catalog.i18nc("model_warning_dialog:title", "WARNING: Custom Supports Reborn").show())
                         self._model_hide_message = True
                     # Define temporary adhesion_type=skirt to force boundary calculation ?
-                _angle = self.defineAngle(EName,position_start)
+                _angle = self.defineAngle(node_name,position_start)
                 if self._support_y_direction:
                     _angle = self.mainAngle(_angle)
                 log('d', 'Angle : ' + str(_angle))
@@ -430,9 +428,8 @@ class CustomSupportsReborn(Tool):
                 # Logger.log('d', 'SHeights : ' + str(self._SHeights)) 
                 if self._support_heights==0 :
                     self._support_heights=position_start.y
-                    self._SSup=self._top_added_height
 
-                self._top=self._SSup+(self._support_heights-position_start.y)
+                self._top=self._top_added_height+(self._support_heights-position_start.y)
                 
             else:
                 self._top=self._top_added_height
@@ -545,11 +542,11 @@ class CustomSupportsReborn(Tool):
         degree = round(degree / 90) * 90
         return math.radians(degree)   
     
-    def defineAngle(self, Cname : str, act_position: Vector) -> float:
-        Angle = 0
-        min_lght = 9999999.999
+    def defineAngle(self, mesh_name : str, act_position: Vector) -> float:
+        angle = 0
+        min_distance = float("inf")
         # Set on the build plate for distance
-        calc_position = Vector(act_position.x, 0, act_position.z)
+        projected_event_position = Vector(act_position.x, 0, act_position.z)
         # Logger.log('d', "Mesh : {}".format(Cname))
         # Logger.log('d', "Position : {}".format(calc_position))
 
@@ -562,7 +559,7 @@ class CustomSupportsReborn(Tool):
                 # Logger.log('d', "isSliceable : {}".format(node.getName()))
                 node_stack=node.callDecoration("getStack")           
                 if node_stack:                    
-                    if node.getName()==Cname :
+                    if node.getName()==mesh_name :
                         # Logger.log('d', "Mesh : {}".format(node.getName()))
                         
                         hull_polygon = node.callDecoration("getAdhesionArea")
@@ -578,62 +575,61 @@ class CustomSupportsReborn(Tool):
                         # nb_pt = point[0] / point[1] must be divided by 2
                         # Angle Ref for angle / Y Dir
                         reference_angle = Vector(0, 0, 1)
-                        Id=0
-                        Start_Id=0
-                        End_Id=0
+                        id=0
+                        start_id=0
+                        end_id=0
                         for point in points:                               
                             # Logger.log('d', "X : {}".format(point[0]))
                             # Logger.log('d', "Point : {}".format(point))
                             new_position = Vector(point[0], 0, point[1])
-                            lg=calc_position-new_position
+                            distance_vector = projected_event_position - new_position
                             # Logger.log('d', "Lg : {}".format(lg))
                             # lght = lg.length()
-                            lght = round(lg.length(),0)
+                            distance = round(distance_vector.length(),0)
 
-                            if lght<min_lght and lght>0 :
-                                min_lght=lght
-                                Start_Id=Id
-                                Select_position = new_position
-                                unit_vector2 = lg.normalized()
+                            if distance < min_distance and distance > 0:
+                                min_distance=distance
+                                start_id=id
+                                normalized_distance = distance_vector.normalized()
                                 # Logger.log('d', "unit_vector2 : {}".format(unit_vector2))
-                                LeSin = math.asin(reference_angle.dot(unit_vector2))
+                                angle_sin = math.asin(reference_angle.dot(normalized_distance))
                                 # LeCos = math.acos(ref.dot(unit_vector2))
                                 
-                                if unit_vector2.x>=0 :
+                                if normalized_distance.x>=0 :
                                     # Logger.log('d', "Angle Pos 1a")
-                                    Angle = math.pi-LeSin  #angle in radian
+                                    angle = math.pi-angle_sin  #angle in radian
                                 else :
                                     # Logger.log('d', "Angle Pos 2a")
-                                    Angle = LeSin                                    
+                                    angle = angle_sin                                    
                                     
-                            if lght==min_lght and lght>0 :
-                                if Id > End_Id+1 :
-                                    Start_Id=Id
-                                    End_Id=Id
+                            if distance==min_distance and distance>0 :
+                                if id > end_id+1 :
+                                    start_id=id
+                                    end_id=id
                                 else :
-                                    End_Id=Id
+                                    end_id=id
                                     
-                            Id+=1
+                            id+=1
                         
                         # Could be the case with automatic .. rarely in pickpoint   
-                        if Start_Id != End_Id :
+                        if start_id != end_id :
                             # Logger.log('d', "Possibility   : {} / {}".format(Start_Id,End_Id))
-                            Id=int(Start_Id+0.5*(End_Id-Start_Id))
+                            id=int(start_id+0.5*(end_id-start_id))
                             # Logger.log('d', "Id   : {}".format(Id))
-                            new_position = Vector(points[Id][0], 0, points[Id][1])
-                            lg=calc_position-new_position                            
-                            unit_vector2 = lg.normalized()
+                            new_position = Vector(points[id][0], 0, points[id][1])
+                            distance_vector=projected_event_position-new_position                            
+                            normalized_distance = distance_vector.normalized()
                             # Logger.log('d', "unit_vector2 : {}".format(unit_vector2))
-                            LeSin = math.asin(reference_angle.dot(unit_vector2))
+                            angle_sin = math.asin(reference_angle.dot(normalized_distance))
                             # LeCos = math.acos(ref.dot(unit_vector2))
                             
-                            if unit_vector2.x >=0 :
+                            if normalized_distance.x >=0 :
                                 # Logger.log('d', "Angle Pos 1b")
-                                Angle = math.pi-LeSin  #angle in radian
+                                angle = math.pi-angle_sin  #angle in radian
                                 
                             else :
                                 # Logger.log('d', "Angle Pos 2b")
-                                Angle = LeSin
+                                angle = angle_sin
                                 
                             
                             # Modification / Spoon not ne same start orientation
@@ -644,7 +640,7 @@ class CustomSupportsReborn(Tool):
                         # Logger.log('d', "Angle Sinus     : {}".format(math.degrees(LeSin)))
                         # Logger.log('d', "Angle Cosinus   : {}".format(math.degrees(LeCos)))
                         # Logger.log('d', "Chose Angle     : {}".format(math.degrees(Angle)))
-        return Angle
+        return angle
         
     def _removeSupportMesh(self, node: CuraSceneNode):
         parent = node.getParent()
@@ -718,51 +714,50 @@ class CustomSupportsReborn(Tool):
         return mesh_data
         
     # Cube Creation
-    def _createCube(self, size, maxs, height, top, dep):
+    def _createCube(self, base_width, max_width, total_height, top_offset, taper_angle):
         mesh = MeshBuilder()
 
         # Intial Comment from Ultimaker B.V. I have never try to verify this point
         # Can't use MeshBuilder.addCube() because that does not get per-vertex normals
         # Per-vertex normals require duplication of vertices
-        s = size / 2
-        sm = maxs / 2
-        l = height 
-        s_inf=s+math.tan(math.radians(dep))*(l+top)
+        half_base_width = base_width / 2
+        half_max_width = max_width / 2
+        bottom_width_tapered = half_base_width + math.tan(math.radians(taper_angle)) * (total_height + top_offset)
         
-        if sm>s and dep!=0:
-            l_max=(sm-s) / math.tan(math.radians(dep))
+        if half_max_width>half_base_width and taper_angle!=0:
+            taper_length = (half_max_width - half_base_width) / math.tan(math.radians(taper_angle))
         else :
-            l_max=l
+            taper_length = total_height
         
         # Difference between Cone and Cone + max base size
-        if l_max<l and l_max>0:
-            nbv=40        
-            verts = [ # 10 faces with 4 corners each
-                [-sm, -l_max,  sm], [-s,  top,  s], [ s,  top,  s], [ sm, -l_max,  sm],
-                [-s,  top, -s], [-sm, -l_max, -sm], [ sm, -l_max, -sm], [ s,  top, -s],
-                [-sm, -l,  sm], [-sm,  -l_max,  sm], [ sm,  -l_max,  sm], [ sm, -l,  sm],
-                [-sm,  -l_max, -sm], [-sm, -l, -sm], [ sm, -l, -sm], [ sm,  -l_max, -sm],
-                [ sm, -l, -sm], [-sm, -l, -sm], [-sm, -l,  sm], [ sm, -l,  sm],
-                [-s,  top, -s], [ s,  top, -s], [ s,  top,  s], [-s,  top,  s],
-                [-sm, -l,  sm], [-sm, -l, -sm], [-sm,  -l_max, -sm], [-sm,  -l_max,  sm],
-                [ sm, -l, -sm], [ sm, -l,  sm], [ sm,  -l_max,  sm], [ sm,  -l_max, -sm],  
-                [-sm, -l_max,  sm], [-sm, -l_max, -sm], [-s,  top, -s], [-s,  top,  s],
-                [ sm, -l_max, -sm], [ sm, -l_max,  sm], [ s,  top,  s], [ s,  top, -s]
+        if taper_length < total_height and taper_length > 0:
+            vertices_per_face=40        
+            vertices = [ # 10 faces with 4 corners each
+                [-half_max_width, -taper_length,  half_max_width], [-half_base_width,  top_offset,  half_base_width], [ half_base_width,  top_offset,  half_base_width], [ half_max_width, -taper_length,  half_max_width],
+                [-half_base_width,  top_offset, -half_base_width], [-half_max_width, -taper_length, -half_max_width], [ half_max_width, -taper_length, -half_max_width], [ half_base_width,  top_offset, -half_base_width],
+                [-half_max_width, -total_height,  half_max_width], [-half_max_width,  -taper_length,  half_max_width], [ half_max_width,  -taper_length,  half_max_width], [ half_max_width, -total_height,  half_max_width],
+                [-half_max_width,  -taper_length, -half_max_width], [-half_max_width, -total_height, -half_max_width], [ half_max_width, -total_height, -half_max_width], [ half_max_width,  -taper_length, -half_max_width],
+                [ half_max_width, -total_height, -half_max_width], [-half_max_width, -total_height, -half_max_width], [-half_max_width, -total_height,  half_max_width], [ half_max_width, -total_height,  half_max_width],
+                [-half_base_width,  top_offset, -half_base_width], [ half_base_width,  top_offset, -half_base_width], [ half_base_width,  top_offset,  half_base_width], [-half_base_width,  top_offset,  half_base_width],
+                [-half_max_width, -total_height,  half_max_width], [-half_max_width, -total_height, -half_max_width], [-half_max_width,  -taper_length, -half_max_width], [-half_max_width,  -taper_length,  half_max_width],
+                [ half_max_width, -total_height, -half_max_width], [ half_max_width, -total_height,  half_max_width], [ half_max_width,  -taper_length,  half_max_width], [ half_max_width,  -taper_length, -half_max_width],  
+                [-half_max_width, -taper_length,  half_max_width], [-half_max_width, -taper_length, -half_max_width], [-half_base_width,  top_offset, -half_base_width], [-half_base_width,  top_offset,  half_base_width],
+                [ half_max_width, -taper_length, -half_max_width], [ half_max_width, -taper_length,  half_max_width], [ half_base_width,  top_offset,  half_base_width], [ half_base_width,  top_offset, -half_base_width]
             ]       
         else:
-            nbv=24        
-            verts = [ # 6 faces with 4 corners each
-                [-s_inf, -l,  s_inf], [-s,  top,  s], [ s,  top,  s], [ s_inf, -l,  s_inf],
-                [-s,  top, -s], [-s_inf, -l, -s_inf], [ s_inf, -l, -s_inf], [ s,  top, -s],
-                [ s_inf, -l, -s_inf], [-s_inf, -l, -s_inf], [-s_inf, -l,  s_inf], [ s_inf, -l,  s_inf],
-                [-s,  top, -s], [ s,  top, -s], [ s,  top,  s], [-s,  top,  s],
-                [-s_inf, -l,  s_inf], [-s_inf, -l, -s_inf], [-s,  top, -s], [-s,  top,  s],
-                [ s_inf, -l, -s_inf], [ s_inf, -l,  s_inf], [ s,  top,  s], [ s,  top, -s]
+            vertices_per_face=24        
+            vertices = [ # 6 faces with 4 corners each
+                [-bottom_width_tapered, -total_height,  bottom_width_tapered], [-half_base_width,  top_offset,  half_base_width], [ half_base_width,  top_offset,  half_base_width], [ bottom_width_tapered, -total_height,  bottom_width_tapered],
+                [-half_base_width,  top_offset, -half_base_width], [-bottom_width_tapered, -total_height, -bottom_width_tapered], [ bottom_width_tapered, -total_height, -bottom_width_tapered], [ half_base_width,  top_offset, -half_base_width],
+                [ bottom_width_tapered, -total_height, -bottom_width_tapered], [-bottom_width_tapered, -total_height, -bottom_width_tapered], [-bottom_width_tapered, -total_height,  bottom_width_tapered], [ bottom_width_tapered, -total_height,  bottom_width_tapered],
+                [-half_base_width,  top_offset, -half_base_width], [ half_base_width,  top_offset, -half_base_width], [ half_base_width,  top_offset,  half_base_width], [-half_base_width,  top_offset,  half_base_width],
+                [-bottom_width_tapered, -total_height,  bottom_width_tapered], [-bottom_width_tapered, -total_height, -bottom_width_tapered], [-half_base_width,  top_offset, -half_base_width], [-half_base_width,  top_offset,  half_base_width],
+                [ bottom_width_tapered, -total_height, -bottom_width_tapered], [ bottom_width_tapered, -total_height,  bottom_width_tapered], [ half_base_width,  top_offset,  half_base_width], [ half_base_width,  top_offset, -half_base_width]
             ]
-        mesh.setVertices(numpy.asarray(verts, dtype=numpy.float32))
+        mesh.setVertices(numpy.asarray(vertices, dtype=numpy.float32))
 
         indices = []
-        for i in range(0, nbv, 4): # All 6 quads (12 triangles)
+        for i in range(0, vertices_per_face, 4): # All 6 quads (12 triangles)
             indices.append([i, i+2, i+1])
             indices.append([i, i+3, i+2])
         mesh.setIndices(numpy.asarray(indices, dtype=numpy.int32))
@@ -771,20 +766,28 @@ class CustomSupportsReborn(Tool):
         return mesh
         
     # Abutment Creation
-    def _createAbutment(self, size, maxs, height, top, dep, ydir):
-    
+    def _createAbutment(self, diameter, max_diameter, total_height, top_offset, taper_angle, y_mirrored):
+        """Creates an abutment mesh.
+
+        Args:
+        diameter: The diameter of the base.
+        max_diameter: The maximum diameter (for tapered abutments).
+        total_height: The height of the main body of the abutment.
+        top_offset: The additional height added to the top of the abutment.
+        taper_angle: The angle of the taper.
+        y_mirrored: Whether the abutment is mirrored in the Y direction.
+        """
         # Logger.log('d', 'Ydir : ' + str(ydir)) 
         mesh = MeshBuilder()
 
-        s = size / 2
-        sm = maxs / 2
-        l = height 
-        s_inf=math.tan(math.radians(dep))*(l+top)+(2*s)
+        radius = diameter / 2
+        max_radius = max_diameter / 2
+        bottom_diameter = math.tan(math.radians(taper_angle)) * (total_height + top_offset) + (2 * radius)
         
-        if sm>s and dep!=0:
-            l_max=(sm-s) / math.tan(math.radians(dep))
+        if max_radius > radius and taper_angle != 0:
+            taper_length = (max_radius-radius) / math.tan(math.radians(taper_angle))
         else :
-            l_max=l
+            taper_length = total_height
         
         # Debug Log Lines
         # Logger.log('d', 's_inf : ' + str(s_inf))
@@ -792,58 +795,58 @@ class CustomSupportsReborn(Tool):
         # Logger.log('d', 'l : ' + str(l))
         
         # Difference between Standart Abutment and Abutment + max base size
-        if l_max<l and l_max>0:
-            nbv=40  
-            if ydir == False :
-                verts = [ # 10 faces with 4 corners each
-                    [-s, -l_max,  sm], [-s,  top,  2*s], [ s,  top,  2*s], [ s, -l_max,  sm],
-                    [-s,  top, -2*s], [-s, -l_max, -sm], [ s, -l_max, -sm], [ s,  top, -2*s],
-                    [-s, -l,  sm], [-s,  -l_max,  sm], [ s,  -l_max,  sm], [ s, -l,  sm],
-                    [-s,  -l_max, -sm], [-s, -l, -sm], [ s, -l, -sm], [ s,  -l_max, -sm],                  
-                    [ s, -l, -sm], [-s, -l, -sm], [-s, -l,  sm], [ s, -l,  sm],
-                    [-s,  top, -2*s], [ s,  top, -2*s], [ s,  top,  2*s], [-s,  top,  2*s],
-                    [-s, -l_max,  sm], [-s, -l_max, -sm], [-s,  top, -2*s], [-s,  top,  2*s],
-                    [ s, -l_max, -sm], [ s, -l_max,  sm], [ s,  top,  2*s], [ s,  top, -2*s],                   
-                    [-s, -l,  sm], [-s, -l, -sm], [-s,  -l_max, -sm], [-s,  -l_max,  sm],
-                    [ s, -l, -sm], [ s, -l,  sm], [ s,  -l_max,  sm], [ s,  -l_max, -sm]
+        if taper_length < total_height and taper_length > 0:
+            vertices_per_segment = 40  
+            if not y_mirrored:
+                vertices = [ # 10 faces with 4 corners each
+                    [-radius, -taper_length,  max_radius], [-radius,  top_offset,  2*radius], [ radius,  top_offset,  2*radius], [ radius, -taper_length,  max_radius],
+                    [-radius,  top_offset, -2*radius], [-radius, -taper_length, -max_radius], [ radius, -taper_length, -max_radius], [ radius,  top_offset, -2*radius],
+                    [-radius, -total_height,  max_radius], [-radius,  -taper_length,  max_radius], [ radius,  -taper_length,  max_radius], [ radius, -total_height,  max_radius],
+                    [-radius,  -taper_length, -max_radius], [-radius, -total_height, -max_radius], [ radius, -total_height, -max_radius], [ radius,  -taper_length, -max_radius],                  
+                    [ radius, -total_height, -max_radius], [-radius, -total_height, -max_radius], [-radius, -total_height,  max_radius], [ radius, -total_height,  max_radius],
+                    [-radius,  top_offset, -2*radius], [ radius,  top_offset, -2*radius], [ radius,  top_offset,  2*radius], [-radius,  top_offset,  2*radius],
+                    [-radius, -taper_length,  max_radius], [-radius, -taper_length, -max_radius], [-radius,  top_offset, -2*radius], [-radius,  top_offset,  2*radius],
+                    [ radius, -taper_length, -max_radius], [ radius, -taper_length,  max_radius], [ radius,  top_offset,  2*radius], [ radius,  top_offset, -2*radius],                   
+                    [-radius, -total_height,  max_radius], [-radius, -total_height, -max_radius], [-radius,  -taper_length, -max_radius], [-radius,  -taper_length,  max_radius],
+                    [ radius, -total_height, -max_radius], [ radius, -total_height,  max_radius], [ radius,  -taper_length,  max_radius], [ radius,  -taper_length, -max_radius]
                 ]
             else:
-                verts = [ # 10 faces with 4 corners each
-                    [-sm, -l_max,  s], [-2*s,  top,  s], [ 2*s,  top,  s], [ sm, -l_max,  s],
-                    [-2*s,  top, -s], [-sm, -l_max, -s], [ sm, -l_max, -s], [ 2*s,  top, -s],                
-                    [-sm, -l,  s], [-sm,  -l_max,  s], [ sm,  -l_max,  s], [ sm, -l,  s],
-                    [-sm,  -l_max, -s], [-sm, -l, -s], [ sm, -l, -s], [ sm,  -l_max, -s],                         
-                    [ sm, -l, -s], [-sm, -l, -s], [-sm, -l,  s], [ sm, -l,  s],
-                    [-2*s,  top, -s], [ 2*s,  top, -s], [ 2*s,  top,  s], [-2*s,  top,  s],             
-                    [-sm, -l_max,  s], [-sm, -l_max, -s], [-2*s,  top, -s], [-2*s,  top,  s],
-                    [ sm, -l_max, -s], [ sm, -l_max,  s], [ 2*s,  top,  s], [ 2*s,  top, -s],                                  
-                    [-sm, -l,  s], [-sm, -l, -s], [-sm,  -l_max, -s], [-sm,  -l_max,  s],
-                    [ sm, -l, -s], [ sm, -l,  s], [ sm,  -l_max,  s], [ sm,  -l_max, -s]
+                vertices = [ # 10 faces with 4 corners each
+                    [-max_radius, -taper_length,  radius], [-2*radius,  top_offset,  radius], [ 2*radius,  top_offset,  radius], [ max_radius, -taper_length,  radius],
+                    [-2*radius,  top_offset, -radius], [-max_radius, -taper_length, -radius], [ max_radius, -taper_length, -radius], [ 2*radius,  top_offset, -radius],                
+                    [-max_radius, -total_height,  radius], [-max_radius,  -taper_length,  radius], [ max_radius,  -taper_length,  radius], [ max_radius, -total_height,  radius],
+                    [-max_radius,  -taper_length, -radius], [-max_radius, -total_height, -radius], [ max_radius, -total_height, -radius], [ max_radius,  -taper_length, -radius],                         
+                    [ max_radius, -total_height, -radius], [-max_radius, -total_height, -radius], [-max_radius, -total_height,  radius], [ max_radius, -total_height,  radius],
+                    [-2*radius,  top_offset, -radius], [ 2*radius,  top_offset, -radius], [ 2*radius,  top_offset,  radius], [-2*radius,  top_offset,  radius],             
+                    [-max_radius, -taper_length,  radius], [-max_radius, -taper_length, -radius], [-2*radius,  top_offset, -radius], [-2*radius,  top_offset,  radius],
+                    [ max_radius, -taper_length, -radius], [ max_radius, -taper_length,  radius], [ 2*radius,  top_offset,  radius], [ 2*radius,  top_offset, -radius],                                  
+                    [-max_radius, -total_height,  radius], [-max_radius, -total_height, -radius], [-max_radius,  -taper_length, -radius], [-max_radius,  -taper_length,  radius],
+                    [ max_radius, -total_height, -radius], [ max_radius, -total_height,  radius], [ max_radius,  -taper_length,  radius], [ max_radius,  -taper_length, -radius]
                 ]             
         else:
-            nbv=24        
-            if ydir == False :
-                verts = [ # 6 faces with 4 corners each
-                    [-s, -l,  s_inf], [-s,  top,  2*s], [ s,  top,  2*s], [ s, -l,  s_inf],
-                    [-s,  top, -2*s], [-s, -l, -s_inf], [ s, -l, -s_inf], [ s,  top, -2*s],
-                    [ s, -l, -s_inf], [-s, -l, -s_inf], [-s, -l,  s_inf], [ s, -l,  s_inf],
-                    [-s,  top, -2*s], [ s,  top, -2*s], [ s,  top,  2*s], [-s,  top,  2*s],
-                    [-s, -l,  s_inf], [-s, -l, -s_inf], [-s,  top, -2*s], [-s,  top,  2*s],
-                    [ s, -l, -s_inf], [ s, -l,  s_inf], [ s,  top,  2*s], [ s,  top, -2*s]
+            vertices_per_segment=24        
+            if not y_mirrored:
+                vertices = [ # 6 faces with 4 corners each
+                    [-radius, -total_height,  bottom_diameter], [-radius,  top_offset,  2*radius], [ radius,  top_offset,  2*radius], [ radius, -total_height,  bottom_diameter],
+                    [-radius,  top_offset, -2*radius], [-radius, -total_height, -bottom_diameter], [ radius, -total_height, -bottom_diameter], [ radius,  top_offset, -2*radius],
+                    [ radius, -total_height, -bottom_diameter], [-radius, -total_height, -bottom_diameter], [-radius, -total_height,  bottom_diameter], [ radius, -total_height,  bottom_diameter],
+                    [-radius,  top_offset, -2*radius], [ radius,  top_offset, -2*radius], [ radius,  top_offset,  2*radius], [-radius,  top_offset,  2*radius],
+                    [-radius, -total_height,  bottom_diameter], [-radius, -total_height, -bottom_diameter], [-radius,  top_offset, -2*radius], [-radius,  top_offset,  2*radius],
+                    [ radius, -total_height, -bottom_diameter], [ radius, -total_height,  bottom_diameter], [ radius,  top_offset,  2*radius], [ radius,  top_offset, -2*radius]
                 ]
             else:
-                verts = [ # 6 faces with 4 corners each
-                    [-s_inf, -l,  s], [-2*s,  top,  s], [ 2*s,  top,  s], [ s_inf, -l,  s],
-                    [-2*s,  top, -s], [-s_inf, -l, -s], [ s_inf, -l, -s], [ 2*s,  top, -s],
-                    [ s_inf, -l, -s], [-s_inf, -l, -s], [-s_inf, -l,  s], [ s_inf, -l,  s],
-                    [-2*s,  top, -s], [ 2*s,  top, -s], [ 2*s,  top,  s], [-2*s,  top,  s],
-                    [-s_inf, -l,  s], [-s_inf, -l, -s], [-2*s,  top, -s], [-2*s,  top,  s],
-                    [ s_inf, -l, -s], [ s_inf, -l,  s], [ 2*s,  top,  s], [ 2*s,  top, -s]
+                vertices = [ # 6 faces with 4 corners each
+                    [-bottom_diameter, -total_height,  radius], [-2*radius,  top_offset,  radius], [ 2*radius,  top_offset,  radius], [ bottom_diameter, -total_height,  radius],
+                    [-2*radius,  top_offset, -radius], [-bottom_diameter, -total_height, -radius], [ bottom_diameter, -total_height, -radius], [ 2*radius,  top_offset, -radius],
+                    [ bottom_diameter, -total_height, -radius], [-bottom_diameter, -total_height, -radius], [-bottom_diameter, -total_height,  radius], [ bottom_diameter, -total_height,  radius],
+                    [-2*radius,  top_offset, -radius], [ 2*radius,  top_offset, -radius], [ 2*radius,  top_offset,  radius], [-2*radius,  top_offset,  radius],
+                    [-bottom_diameter, -total_height,  radius], [-bottom_diameter, -total_height, -radius], [-2*radius,  top_offset, -radius], [-2*radius,  top_offset,  radius],
+                    [ bottom_diameter, -total_height, -radius], [ bottom_diameter, -total_height,  radius], [ 2*radius,  top_offset,  radius], [ 2*radius,  top_offset, -radius]
                 ]        
-        mesh.setVertices(numpy.asarray(verts, dtype=numpy.float32))
+        mesh.setVertices(numpy.asarray(vertices, dtype=numpy.float32))
 
         indices = []
-        for i in range(0, nbv, 4): # All 6 quads (12 triangles)
+        for i in range(0, vertices_per_segment, 4): # All 6 quads (12 triangles)
             indices.append([i, i+2, i+1])
             indices.append([i, i+3, i+2])
         mesh.setIndices(numpy.asarray(indices, dtype=numpy.int32))
@@ -852,79 +855,79 @@ class CustomSupportsReborn(Tool):
         return mesh
         
     # Cylinder creation
-    def _createCylinder(self, size, maxs, nb , lg , sup ,dep):
+    def _createCylinder(self, diameter, max_diameter, cirlce_segments, length, top_additional_height, taper_angle):
         mesh = MeshBuilder()
         # Per-vertex normals require duplication of vertices
-        r = size / 2
-        rm = maxs / 2
+        radius = diameter / 2
+        max_radius = max_diameter / 2
 
-        l = -lg
-        rng = int(360 / nb)
-        ang = math.radians(nb)
-        r_inf=math.tan(math.radians(dep))*lg+r
-        if rm>r and dep!=0 :
-            l_max=(rm-r) / math.tan(math.radians(dep))
+        negative_length = -length
+        num_segments = int(360 / cirlce_segments)
+        angle_increment_radius = math.radians(cirlce_segments)
+        bottom_outer_radius=math.tan(math.radians(taper_angle)) * length + radius
+        if max_radius>radius and taper_angle!=0 :
+            taper_length = (max_radius-radius) / math.tan(math.radians(taper_angle))
         else :
-            l_max=l
+            taper_length = negative_length
             
         #Logger.log('d', 'lg : ' + str(lg))
         #Logger.log('d', 'l_max : ' + str(l_max)) 
         
-        verts = []
-        if l_max<lg and l_max>0:
-            nbv=18
-            for i in range(0, rng):
+        vertices = []
+        if taper_length < length and taper_length > 0:
+            vertices_per_segment = 18  # This magic number is originally 18
+            for i in range(0, num_segments):
                 # Top
-                verts.append([0, sup, 0])
-                verts.append([r*math.cos((i+1)*ang), sup, r*math.sin((i+1)*ang)])
-                verts.append([r*math.cos(i*ang), sup, r*math.sin(i*ang)])
+                vertices.append([0, top_additional_height, 0])
+                vertices.append([radius*math.cos((i+1)*angle_increment_radius), top_additional_height, radius*math.sin((i+1)*angle_increment_radius)])
+                vertices.append([radius*math.cos(i*angle_increment_radius), top_additional_height, radius*math.sin(i*angle_increment_radius)])
                 #Side 1a
-                verts.append([r*math.cos(i*ang), sup, r*math.sin(i*ang)])
-                verts.append([r*math.cos((i+1)*ang), sup, r*math.sin((i+1)*ang)])
-                verts.append([rm*math.cos((i+1)*ang), -l_max, rm*math.sin((i+1)*ang)])
+                vertices.append([radius*math.cos(i*angle_increment_radius), top_additional_height, radius*math.sin(i*angle_increment_radius)])
+                vertices.append([radius*math.cos((i+1)*angle_increment_radius), top_additional_height, radius*math.sin((i+1)*angle_increment_radius)])
+                vertices.append([max_radius*math.cos((i+1)*angle_increment_radius), -taper_length, max_radius*math.sin((i+1)*angle_increment_radius)])
                 #Side 1b
-                verts.append([rm*math.cos((i+1)*ang), -l_max, rm*math.sin((i+1)*ang)])
-                verts.append([rm*math.cos(i*ang), -l_max, rm*math.sin(i*ang)])
-                verts.append([r*math.cos(i*ang), sup, r*math.sin(i*ang)])
+                vertices.append([max_radius*math.cos((i+1)*angle_increment_radius), -taper_length, max_radius*math.sin((i+1)*angle_increment_radius)])
+                vertices.append([max_radius*math.cos(i*angle_increment_radius), -taper_length, max_radius*math.sin(i*angle_increment_radius)])
+                vertices.append([radius*math.cos(i*angle_increment_radius), top_additional_height, radius*math.sin(i*angle_increment_radius)])
                 #Side 2a
-                verts.append([rm*math.cos(i*ang), -l_max, rm*math.sin(i*ang)])
-                verts.append([rm*math.cos((i+1)*ang), -l_max, rm*math.sin((i+1)*ang)])
-                verts.append([rm*math.cos((i+1)*ang), l, rm*math.sin((i+1)*ang)])
+                vertices.append([max_radius*math.cos(i*angle_increment_radius), -taper_length, max_radius*math.sin(i*angle_increment_radius)])
+                vertices.append([max_radius*math.cos((i+1)*angle_increment_radius), -taper_length, max_radius*math.sin((i+1)*angle_increment_radius)])
+                vertices.append([max_radius*math.cos((i+1)*angle_increment_radius), negative_length, max_radius*math.sin((i+1)*angle_increment_radius)])
                 #Side 2b
-                verts.append([rm*math.cos((i+1)*ang), l, rm*math.sin((i+1)*ang)])
-                verts.append([rm*math.cos(i*ang), l, rm*math.sin(i*ang)])
-                verts.append([rm*math.cos(i*ang), -l_max, rm*math.sin(i*ang)])
+                vertices.append([max_radius*math.cos((i+1)*angle_increment_radius), negative_length, max_radius*math.sin((i+1)*angle_increment_radius)])
+                vertices.append([max_radius*math.cos(i*angle_increment_radius), negative_length, max_radius*math.sin(i*angle_increment_radius)])
+                vertices.append([max_radius*math.cos(i*angle_increment_radius), -taper_length, max_radius*math.sin(i*angle_increment_radius)])
                 #Bottom 
-                verts.append([0, l, 0])
-                verts.append([rm*math.cos(i*ang), l, rm*math.sin(i*ang)])
-                verts.append([rm*math.cos((i+1)*ang), l, rm*math.sin((i+1)*ang)]) 
+                vertices.append([0, negative_length, 0])
+                vertices.append([max_radius*math.cos(i*angle_increment_radius), negative_length, max_radius*math.sin(i*angle_increment_radius)])
+                vertices.append([max_radius*math.cos((i+1)*angle_increment_radius), negative_length, max_radius*math.sin((i+1)*angle_increment_radius)]) 
                 
         else:
-            nbv=12
-            for i in range(0, rng):
+            vertices_per_segment=12  # This magic number is originally 12
+            for i in range(0, num_segments):
                 # Top
-                verts.append([0, sup, 0])
-                verts.append([r*math.cos((i+1)*ang), sup, r*math.sin((i+1)*ang)])
-                verts.append([r*math.cos(i*ang), sup, r*math.sin(i*ang)])
+                vertices.append([0, top_additional_height, 0])
+                vertices.append([radius*math.cos((i+1)*angle_increment_radius), top_additional_height, radius*math.sin((i+1)*angle_increment_radius)])
+                vertices.append([radius*math.cos(i*angle_increment_radius), top_additional_height, radius*math.sin(i*angle_increment_radius)])
                 #Side 1a
-                verts.append([r*math.cos(i*ang), sup, r*math.sin(i*ang)])
-                verts.append([r*math.cos((i+1)*ang), sup, r*math.sin((i+1)*ang)])
-                verts.append([r_inf*math.cos((i+1)*ang), l, r_inf*math.sin((i+1)*ang)])
+                vertices.append([radius*math.cos(i*angle_increment_radius), top_additional_height, radius*math.sin(i*angle_increment_radius)])
+                vertices.append([radius*math.cos((i+1)*angle_increment_radius), top_additional_height, radius*math.sin((i+1)*angle_increment_radius)])
+                vertices.append([bottom_outer_radius*math.cos((i+1)*angle_increment_radius), negative_length, bottom_outer_radius*math.sin((i+1)*angle_increment_radius)])
                 #Side 1b
-                verts.append([r_inf*math.cos((i+1)*ang), l, r_inf*math.sin((i+1)*ang)])
-                verts.append([r_inf*math.cos(i*ang), l, r_inf*math.sin(i*ang)])
-                verts.append([r*math.cos(i*ang), sup, r*math.sin(i*ang)])
+                vertices.append([bottom_outer_radius*math.cos((i+1)*angle_increment_radius), negative_length, bottom_outer_radius*math.sin((i+1)*angle_increment_radius)])
+                vertices.append([bottom_outer_radius*math.cos(i*angle_increment_radius), negative_length, bottom_outer_radius*math.sin(i*angle_increment_radius)])
+                vertices.append([radius*math.cos(i*angle_increment_radius), top_additional_height, radius*math.sin(i*angle_increment_radius)])
                 #Bottom 
-                verts.append([0, l, 0])
-                verts.append([r_inf*math.cos(i*ang), l, r_inf*math.sin(i*ang)])
-                verts.append([r_inf*math.cos((i+1)*ang), l, r_inf*math.sin((i+1)*ang)])
+                vertices.append([0, negative_length, 0])
+                vertices.append([bottom_outer_radius*math.cos(i*angle_increment_radius), negative_length, bottom_outer_radius*math.sin(i*angle_increment_radius)])
+                vertices.append([bottom_outer_radius*math.cos((i+1)*angle_increment_radius), negative_length, bottom_outer_radius*math.sin((i+1)*angle_increment_radius)])
         
-        mesh.setVertices(numpy.asarray(verts, dtype=numpy.float32))
+        mesh.setVertices(numpy.asarray(vertices, dtype=numpy.float32))
 
         indices = []
         # for every angle increment nbv (12 or 18) Vertices
-        tot = rng * nbv
-        for i in range(0, tot, 3): # 
+        total_vertices = num_segments * vertices_per_segment
+        for i in range(0, total_vertices, 3): # 
             indices.append([i, i+1, i+2])
         mesh.setIndices(numpy.asarray(indices, dtype=numpy.int32))
 
@@ -932,121 +935,122 @@ class CustomSupportsReborn(Tool):
         return mesh
  
    # Tube creation
-    def _createTube(self, support_size, maxs, isize, nb , lg, sup ,dep):
+    def _createTube(self, outer_diameter, max_diameter, inner_diameter, circle_segments, length, top_additional_height, taper_angle):
         # Logger.log('d', 'isize : ' + str(isize)) 
         mesh = MeshBuilder()
         # Per-vertex normals require duplication of vertices
-        r = support_size / 2
-        ri = isize / 2
-        rm = maxs / 2
-        l = -lg
-        rng = int(360 / nb)
-        ang = math.radians(nb)
-        r_inf=math.tan(math.radians(dep))*lg+r
-        if rm>r and dep!=0:
-            l_max=(rm-r) / math.tan(math.radians(dep))
+        outer_radius = outer_diameter / 2
+        inner_radius = inner_diameter / 2
+        max_radius = max_diameter / 2
+        negative_length = -length
+        num_segments = int(360 / circle_segments)
+        angle_increment_radians = math.radians(circle_segments)
+        bottom_outer_radius = math.tan(math.radians(taper_angle)) * length + outer_radius  # How wide it will be at the bottom
+        # Length of the tapered section
+        if max_radius > outer_radius and taper_angle != 0:
+            taper_length= (max_radius-outer_radius) / math.tan(math.radians(taper_angle))
         else :
-            l_max=l
+            taper_length = negative_length
             
-        verts = []
-        if l_max<lg and l_max>0:
-            nbv=30
-            for i in range(0, rng):
+        vertices = []
+        if taper_length < length and taper_length > 0:
+            vertices_per_segment=30  # This magic number is originally 30
+            for i in range(0, num_segments):
                 # Top
-                verts.append([ri*math.cos(i*ang), sup, ri*math.sin(i*ang)])
-                verts.append([r*math.cos((i+1)*ang), sup, r*math.sin((i+1)*ang)])
-                verts.append([r*math.cos(i*ang), sup, r*math.sin(i*ang)])
+                vertices.append([inner_radius*math.cos(i*angle_increment_radians), top_additional_height, inner_radius*math.sin(i*angle_increment_radians)])
+                vertices.append([outer_radius*math.cos((i+1)*angle_increment_radians), top_additional_height, outer_radius*math.sin((i+1)*angle_increment_radians)])
+                vertices.append([outer_radius*math.cos(i*angle_increment_radians), top_additional_height, outer_radius*math.sin(i*angle_increment_radians)])
                 
-                verts.append([ri*math.cos((i+1)*ang), sup, ri*math.sin((i+1)*ang)])
-                verts.append([r*math.cos((i+1)*ang), sup, r*math.sin((i+1)*ang)])
-                verts.append([ri*math.cos(i*ang), sup, ri*math.sin(i*ang)])
+                vertices.append([inner_radius*math.cos((i+1)*angle_increment_radians), top_additional_height, inner_radius*math.sin((i+1)*angle_increment_radians)])
+                vertices.append([outer_radius*math.cos((i+1)*angle_increment_radians), top_additional_height, outer_radius*math.sin((i+1)*angle_increment_radians)])
+                vertices.append([inner_radius*math.cos(i*angle_increment_radians), top_additional_height, inner_radius*math.sin(i*angle_increment_radians)])
 
                 #Side 1a
-                verts.append([r*math.cos(i*ang), sup, r*math.sin(i*ang)])
-                verts.append([r*math.cos((i+1)*ang), sup, r*math.sin((i+1)*ang)])
-                verts.append([rm*math.cos((i+1)*ang), -l_max, rm*math.sin((i+1)*ang)])
+                vertices.append([outer_radius*math.cos(i*angle_increment_radians), top_additional_height, outer_radius*math.sin(i*angle_increment_radians)])
+                vertices.append([outer_radius*math.cos((i+1)*angle_increment_radians), top_additional_height, outer_radius*math.sin((i+1)*angle_increment_radians)])
+                vertices.append([max_radius*math.cos((i+1)*angle_increment_radians), -taper_length, max_radius*math.sin((i+1)*angle_increment_radians)])
                 
                 #Side 1b
-                verts.append([rm*math.cos((i+1)*ang), -l_max, rm*math.sin((i+1)*ang)])
-                verts.append([rm*math.cos(i*ang), -l_max, rm*math.sin(i*ang)])
-                verts.append([r*math.cos(i*ang), sup, r*math.sin(i*ang)])
+                vertices.append([max_radius*math.cos((i+1)*angle_increment_radians), -taper_length, max_radius*math.sin((i+1)*angle_increment_radians)])
+                vertices.append([max_radius*math.cos(i*angle_increment_radians), -taper_length, max_radius*math.sin(i*angle_increment_radians)])
+                vertices.append([outer_radius*math.cos(i*angle_increment_radians), top_additional_height, outer_radius*math.sin(i*angle_increment_radians)])
                 
                 #Side 2a
-                verts.append([rm*math.cos(i*ang), -l_max, rm*math.sin(i*ang)])
-                verts.append([rm*math.cos((i+1)*ang), -l_max, rm*math.sin((i+1)*ang)])
-                verts.append([rm*math.cos((i+1)*ang), l, rm*math.sin((i+1)*ang)])
+                vertices.append([max_radius*math.cos(i*angle_increment_radians), -taper_length, max_radius*math.sin(i*angle_increment_radians)])
+                vertices.append([max_radius*math.cos((i+1)*angle_increment_radians), -taper_length, max_radius*math.sin((i+1)*angle_increment_radians)])
+                vertices.append([max_radius*math.cos((i+1)*angle_increment_radians), negative_length, max_radius*math.sin((i+1)*angle_increment_radians)])
                 
                 #Side 2b
-                verts.append([rm*math.cos((i+1)*ang), l, rm*math.sin((i+1)*ang)])
-                verts.append([rm*math.cos(i*ang), l, rm*math.sin(i*ang)])
-                verts.append([rm*math.cos(i*ang), -l_max, rm*math.sin(i*ang)])
+                vertices.append([max_radius*math.cos((i+1)*angle_increment_radians), negative_length, max_radius*math.sin((i+1)*angle_increment_radians)])
+                vertices.append([max_radius*math.cos(i*angle_increment_radians), negative_length, max_radius*math.sin(i*angle_increment_radians)])
+                vertices.append([max_radius*math.cos(i*angle_increment_radians), -taper_length, max_radius*math.sin(i*angle_increment_radians)])
                 
                 #Bottom 
-                verts.append([ri*math.cos(i*ang), l, ri*math.sin(i*ang)])
-                verts.append([rm*math.cos(i*ang), l, rm*math.sin(i*ang)])
-                verts.append([rm*math.cos((i+1)*ang), l, rm*math.sin((i+1)*ang)]) 
+                vertices.append([inner_radius*math.cos(i*angle_increment_radians), negative_length, inner_radius*math.sin(i*angle_increment_radians)])
+                vertices.append([max_radius*math.cos(i*angle_increment_radians), negative_length, max_radius*math.sin(i*angle_increment_radians)])
+                vertices.append([max_radius*math.cos((i+1)*angle_increment_radians), negative_length, max_radius*math.sin((i+1)*angle_increment_radians)]) 
                 
-                verts.append([ri*math.cos((i+1)*ang), l, ri*math.sin((i+1)*ang)])
-                verts.append([ri*math.cos(i*ang), l, ri*math.sin(i*ang)])
-                verts.append([rm*math.cos((i+1)*ang), l, rm*math.sin((i+1)*ang)]) 
+                vertices.append([inner_radius*math.cos((i+1)*angle_increment_radians), negative_length, inner_radius*math.sin((i+1)*angle_increment_radians)])
+                vertices.append([inner_radius*math.cos(i*angle_increment_radians), negative_length, inner_radius*math.sin(i*angle_increment_radians)])
+                vertices.append([max_radius*math.cos((i+1)*angle_increment_radians), negative_length, max_radius*math.sin((i+1)*angle_increment_radians)]) 
                 
                 #Side Inta
-                verts.append([ri*math.cos(i*ang), sup, ri*math.sin(i*ang)])
-                verts.append([ri*math.cos((i+1)*ang), l, ri*math.sin((i+1)*ang)])
-                verts.append([ri*math.cos((i+1)*ang), sup, ri*math.sin((i+1)*ang)])
+                vertices.append([inner_radius*math.cos(i*angle_increment_radians), top_additional_height, inner_radius*math.sin(i*angle_increment_radians)])
+                vertices.append([inner_radius*math.cos((i+1)*angle_increment_radians), negative_length, inner_radius*math.sin((i+1)*angle_increment_radians)])
+                vertices.append([inner_radius*math.cos((i+1)*angle_increment_radians), top_additional_height, inner_radius*math.sin((i+1)*angle_increment_radians)])
                 
                 #Side Intb
-                verts.append([ri*math.cos((i+1)*ang), l, ri*math.sin((i+1)*ang)])
-                verts.append([ri*math.cos(i*ang), sup, ri*math.sin(i*ang)])
-                verts.append([ri*math.cos(i*ang), l, ri*math.sin(i*ang)])
+                vertices.append([inner_radius*math.cos((i+1)*angle_increment_radians), negative_length, inner_radius*math.sin((i+1)*angle_increment_radians)])
+                vertices.append([inner_radius*math.cos(i*angle_increment_radians), top_additional_height, inner_radius*math.sin(i*angle_increment_radians)])
+                vertices.append([inner_radius*math.cos(i*angle_increment_radians), negative_length, inner_radius*math.sin(i*angle_increment_radians)])
                 
         else:
-            nbv=24
-            for i in range(0, rng):
+            vertices_per_segment=24  # This magic number is originally 24
+            for i in range(0, num_segments):
                 # Top
-                verts.append([ri*math.cos(i*ang), sup, ri*math.sin(i*ang)])
-                verts.append([r*math.cos((i+1)*ang), sup, r*math.sin((i+1)*ang)])
-                verts.append([r*math.cos(i*ang), sup, r*math.sin(i*ang)])
+                vertices.append([inner_radius*math.cos(i*angle_increment_radians), top_additional_height, inner_radius*math.sin(i*angle_increment_radians)])
+                vertices.append([outer_radius*math.cos((i+1)*angle_increment_radians), top_additional_height, outer_radius*math.sin((i+1)*angle_increment_radians)])
+                vertices.append([outer_radius*math.cos(i*angle_increment_radians), top_additional_height, outer_radius*math.sin(i*angle_increment_radians)])
                 
-                verts.append([ri*math.cos((i+1)*ang), sup, ri*math.sin((i+1)*ang)])
-                verts.append([r*math.cos((i+1)*ang), sup, r*math.sin((i+1)*ang)])
-                verts.append([ri*math.cos(i*ang), sup, ri*math.sin(i*ang)])
+                vertices.append([inner_radius*math.cos((i+1)*angle_increment_radians), top_additional_height, inner_radius*math.sin((i+1)*angle_increment_radians)])
+                vertices.append([outer_radius*math.cos((i+1)*angle_increment_radians), top_additional_height, outer_radius*math.sin((i+1)*angle_increment_radians)])
+                vertices.append([inner_radius*math.cos(i*angle_increment_radians), top_additional_height, inner_radius*math.sin(i*angle_increment_radians)])
                 
                 #Side 1a
-                verts.append([r*math.cos(i*ang), sup, r*math.sin(i*ang)])
-                verts.append([r*math.cos((i+1)*ang), sup, r*math.sin((i+1)*ang)])
-                verts.append([r_inf*math.cos((i+1)*ang), l, r_inf*math.sin((i+1)*ang)])
+                vertices.append([outer_radius*math.cos(i*angle_increment_radians), top_additional_height, outer_radius*math.sin(i*angle_increment_radians)])
+                vertices.append([outer_radius*math.cos((i+1)*angle_increment_radians), top_additional_height, outer_radius*math.sin((i+1)*angle_increment_radians)])
+                vertices.append([bottom_outer_radius*math.cos((i+1)*angle_increment_radians), negative_length, bottom_outer_radius*math.sin((i+1)*angle_increment_radians)])
                 
                 #Side 1b
-                verts.append([r_inf*math.cos((i+1)*ang), l, r_inf*math.sin((i+1)*ang)])
-                verts.append([r_inf*math.cos(i*ang), l, r_inf*math.sin(i*ang)])
-                verts.append([r*math.cos(i*ang), sup, r*math.sin(i*ang)])
+                vertices.append([bottom_outer_radius*math.cos((i+1)*angle_increment_radians), negative_length, bottom_outer_radius*math.sin((i+1)*angle_increment_radians)])
+                vertices.append([bottom_outer_radius*math.cos(i*angle_increment_radians), negative_length, bottom_outer_radius*math.sin(i*angle_increment_radians)])
+                vertices.append([outer_radius*math.cos(i*angle_increment_radians), top_additional_height, outer_radius*math.sin(i*angle_increment_radians)])
                 
                 #Bottom 
-                verts.append([ri*math.cos(i*ang), l, ri*math.sin(i*ang)])
-                verts.append([r_inf*math.cos(i*ang), l, r_inf*math.sin(i*ang)])
-                verts.append([r_inf*math.cos((i+1)*ang), l, r_inf*math.sin((i+1)*ang)]) 
+                vertices.append([inner_radius*math.cos(i*angle_increment_radians), negative_length, inner_radius*math.sin(i*angle_increment_radians)])
+                vertices.append([bottom_outer_radius*math.cos(i*angle_increment_radians), negative_length, bottom_outer_radius*math.sin(i*angle_increment_radians)])
+                vertices.append([bottom_outer_radius*math.cos((i+1)*angle_increment_radians), negative_length, bottom_outer_radius*math.sin((i+1)*angle_increment_radians)]) 
                 
-                verts.append([ri*math.cos((i+1)*ang), l, ri*math.sin((i+1)*ang)])
-                verts.append([ri*math.cos(i*ang), l, ri*math.sin(i*ang)])
-                verts.append([r_inf*math.cos((i+1)*ang), l, r_inf*math.sin((i+1)*ang)]) 
+                vertices.append([inner_radius*math.cos((i+1)*angle_increment_radians), negative_length, inner_radius*math.sin((i+1)*angle_increment_radians)])
+                vertices.append([inner_radius*math.cos(i*angle_increment_radians), negative_length, inner_radius*math.sin(i*angle_increment_radians)])
+                vertices.append([bottom_outer_radius*math.cos((i+1)*angle_increment_radians), negative_length, bottom_outer_radius*math.sin((i+1)*angle_increment_radians)]) 
                 
                 #Side Inta
-                verts.append([ri*math.cos(i*ang), sup, ri*math.sin(i*ang)])
-                verts.append([ri*math.cos((i+1)*ang), l, ri*math.sin((i+1)*ang)])
-                verts.append([ri*math.cos((i+1)*ang), sup, ri*math.sin((i+1)*ang)])
+                vertices.append([inner_radius*math.cos(i*angle_increment_radians), top_additional_height, inner_radius*math.sin(i*angle_increment_radians)])
+                vertices.append([inner_radius*math.cos((i+1)*angle_increment_radians), negative_length, inner_radius*math.sin((i+1)*angle_increment_radians)])
+                vertices.append([inner_radius*math.cos((i+1)*angle_increment_radians), top_additional_height, inner_radius*math.sin((i+1)*angle_increment_radians)])
                 
                 #Side Intb
-                verts.append([ri*math.cos((i+1)*ang), l, ri*math.sin((i+1)*ang)])
-                verts.append([ri*math.cos(i*ang), sup, ri*math.sin(i*ang)])
-                verts.append([ri*math.cos(i*ang), l, ri*math.sin(i*ang)])
+                vertices.append([inner_radius*math.cos((i+1)*angle_increment_radians), negative_length, inner_radius*math.sin((i+1)*angle_increment_radians)])
+                vertices.append([inner_radius*math.cos(i*angle_increment_radians), top_additional_height, inner_radius*math.sin(i*angle_increment_radians)])
+                vertices.append([inner_radius*math.cos(i*angle_increment_radians), negative_length, inner_radius*math.sin(i*angle_increment_radians)])
 
-        mesh.setVertices(numpy.asarray(verts, dtype=numpy.float32))
+        mesh.setVertices(numpy.asarray(vertices, dtype=numpy.float32))
 
         indices = []
         # for every angle increment ( 24  or 30 ) Vertices
-        tot = rng * nbv
-        for i in range(0, tot, 3): # 
+        total_vertices = num_segments * vertices_per_segment
+        for i in range(0, total_vertices, 3): # 
             indices.append([i, i+1, i+2])
         mesh.setIndices(numpy.asarray(indices, dtype=numpy.int32))
 
@@ -1054,61 +1058,61 @@ class CustomSupportsReborn(Tool):
         return mesh
         
     # Line Support Creation
-    def _createLine(self, size, maxs, pos1 , pos2, dep, ztop):
+    def _createLine(self, diameter, max_diameter, start_position , end_position, taper_angle, top_z):
         mesh = MeshBuilder()
         # Init point
-        Pt1 = Vector(pos1.x,pos1.z,pos1.y)
-        Pt2 = Vector(pos2.x,pos2.z,pos2.y)
+        start_point = Vector(start_position.x,start_position.z,start_position.y)
+        end_point = Vector(end_position.x,end_position.z,end_position.y)
 
-        V_Dir = Pt2 - Pt1
+        line_direction = end_point - start_point
 
         # Calcul vecteur
-        s = size / 2
-        sm = maxs / 2
-        l_a = pos1.y 
-        s_infa=math.tan(math.radians(dep))*l_a+s
-        l_b = pos2.y 
-        s_infb=math.tan(math.radians(dep))*l_b+s
+        radius = diameter / 2
+        max_radius = max_diameter / 2
+        start_height = start_position.y 
+        start_bottom_radius=math.tan(math.radians(taper_angle))*start_height+radius
+        end_height = end_position.y 
+        end_bottom_radius=math.tan(math.radians(taper_angle))*end_height+radius
  
-        if sm>s and dep!=0:
-            l_max_a=(sm-s) / math.tan(math.radians(dep))
-            l_max_b=(sm-s) / math.tan(math.radians(dep))
+        if max_radius > radius and taper_angle != 0:
+            start_taper_length = (max_radius - radius) / math.tan(math.radians(taper_angle))
+            end_taper_length = (max_radius - radius) / math.tan(math.radians(taper_angle))
         else :
-            l_max_a=l_a
-            l_max_b=l_b
+            start_taper_length=start_height
+            end_taper_length=end_height
  
-        Vtop = Vector(0,0,ztop)
-        VZ = Vector(0,0,s)
-        VZa = Vector(0,0,-l_a)
-        VZb = Vector(0,0,-l_b)
+        top_offset_vector = Vector(0,0,top_z)
+        radius_vector = Vector(0,0,radius)
+        start_height_vector = Vector(0,0,-start_height)
+        end_height_vector = Vector(0,0,-end_height)
         
-        Norm=Vector.cross(V_Dir,VZ).normalized()
-        Dec = Vector(Norm.x*s,Norm.y*s,Norm.z*s)
+        normal_vector = Vector.cross(line_direction, radius_vector).normalized()
+        outer_radius_offset = Vector(normal_vector.x*radius,normal_vector.y*radius,normal_vector.z*radius)
             
-        if l_max_a<l_a and l_max_b<l_b and l_max_a>0 and l_max_b>0: 
-            nbv=40
+        if start_taper_length < start_height and end_taper_length < end_height and start_taper_length > 0 and end_taper_length > 0: 
+            vertices_per_segment=40
             
-            Deca = Vector(Norm.x*sm,Norm.y*sm,Norm.z*sm)
-            Decb = Vector(Norm.x*sm,Norm.y*sm,Norm.z*sm)
+            start_max_radius_offset = Vector(normal_vector.x*max_radius,normal_vector.y*max_radius,normal_vector.z*max_radius)
+            end_max_radius_offset = Vector(normal_vector.x*max_radius,normal_vector.y*max_radius,normal_vector.z*max_radius)
 
-            VZam = Vector(0,0,-l_max_a)
-            VZbm = Vector(0,0,-l_max_b)
+            start_max_taper_height_vector = Vector(0,0,-start_taper_length)
+            end_max_taper_height_vector = Vector(0,0,-end_taper_length)
         
             # X Z Y
-            P_1t = Vtop+Dec
-            P_2t = Vtop-Dec
-            P_3t = V_Dir+Vtop+Dec
-            P_4t = V_Dir+Vtop-Dec
+            point_1_top = top_offset_vector + outer_radius_offset
+            point_2_top = top_offset_vector-outer_radius_offset
+            point_3_top = line_direction+top_offset_vector+outer_radius_offset
+            point_4_top = line_direction+top_offset_vector-outer_radius_offset
  
-            P_1m = VZam+Deca
-            P_2m = VZam-Deca
-            P_3m = VZbm+V_Dir+Decb
-            P_4m = VZbm+V_Dir-Decb
+            point_1_start_max_taper = start_max_taper_height_vector+start_max_radius_offset
+            point_2_start_max_taper = start_max_taper_height_vector-start_max_radius_offset
+            point_3_end_max_taper = end_max_taper_height_vector+line_direction+end_max_radius_offset
+            point_4_end_max_taper = end_max_taper_height_vector+line_direction-end_max_radius_offset
             
-            P_1i = VZa+Deca
-            P_2i = VZa-Deca
-            P_3i = VZb+V_Dir+Decb
-            P_4i = VZb+V_Dir-Decb
+            point_1_start_inner = start_height_vector+start_max_radius_offset
+            point_2_start_inner = start_height_vector-start_max_radius_offset
+            point_3_end_inner = end_height_vector+line_direction+end_max_radius_offset
+            point_4_end_inner = end_height_vector+line_direction-end_max_radius_offset
              
             """
             1) Top
@@ -1123,34 +1127,34 @@ class CustomSupportsReborn(Tool):
             10) Bottom
             """
             verts = [ # 10 faces with 4 corners each
-                [P_1t.x, P_1t.z, P_1t.y], [P_2t.x, P_2t.z, P_2t.y], [P_4t.x, P_4t.z, P_4t.y], [P_3t.x, P_3t.z, P_3t.y],              
-                [P_1t.x, P_1t.z, P_1t.y], [P_3t.x, P_3t.z, P_3t.y], [P_3m.x, P_3m.z, P_3m.y], [P_1m.x, P_1m.z, P_1m.y],
-                [P_2t.x, P_2t.z, P_2t.y], [P_1t.x, P_1t.z, P_1t.y], [P_1m.x, P_1m.z, P_1m.y], [P_2m.x, P_2m.z, P_2m.y],
-                [P_3t.x, P_3t.z, P_3t.y], [P_4t.x, P_4t.z, P_4t.y], [P_4m.x, P_4m.z, P_4m.y], [P_3m.x, P_3m.z, P_3m.y],
-                [P_4t.x, P_4t.z, P_4t.y], [P_2t.x, P_2t.z, P_2t.y], [P_2m.x, P_2m.z, P_2m.y], [P_4m.x, P_4m.z, P_4m.y],
-                [P_1m.x, P_1m.z, P_1m.y], [P_3m.x, P_3m.z, P_3m.y], [P_3i.x, P_3i.z, P_3i.y], [P_1i.x, P_1i.z, P_1i.y],
-                [P_2m.x, P_2m.z, P_2m.y], [P_1m.x, P_1m.z, P_1m.y], [P_1i.x, P_1i.z, P_1i.y], [P_2i.x, P_2i.z, P_2i.y],
-                [P_3m.x, P_3m.z, P_3m.y], [P_4m.x, P_4m.z, P_4m.y], [P_4i.x, P_4i.z, P_4i.y], [P_3i.x, P_3i.z, P_3i.y],
-                [P_4m.x, P_4m.z, P_4m.y], [P_2m.x, P_2m.z, P_2m.y], [P_2i.x, P_2i.z, P_2i.y], [P_4i.x, P_4i.z, P_4i.y],
-                [P_1i.x, P_1i.z, P_1i.y], [P_2i.x, P_2i.z, P_2i.y], [P_4i.x, P_4i.z, P_4i.y], [P_3i.x, P_3i.z, P_3i.y]
+                [point_1_top.x, point_1_top.z, point_1_top.y], [point_2_top.x, point_2_top.z, point_2_top.y], [point_4_top.x, point_4_top.z, point_4_top.y], [point_3_top.x, point_3_top.z, point_3_top.y],              
+                [point_1_top.x, point_1_top.z, point_1_top.y], [point_3_top.x, point_3_top.z, point_3_top.y], [point_3_end_max_taper.x, point_3_end_max_taper.z, point_3_end_max_taper.y], [point_1_start_max_taper.x, point_1_start_max_taper.z, point_1_start_max_taper.y],
+                [point_2_top.x, point_2_top.z, point_2_top.y], [point_1_top.x, point_1_top.z, point_1_top.y], [point_1_start_max_taper.x, point_1_start_max_taper.z, point_1_start_max_taper.y], [point_2_start_max_taper.x, point_2_start_max_taper.z, point_2_start_max_taper.y],
+                [point_3_top.x, point_3_top.z, point_3_top.y], [point_4_top.x, point_4_top.z, point_4_top.y], [point_4_end_max_taper.x, point_4_end_max_taper.z, point_4_end_max_taper.y], [point_3_end_max_taper.x, point_3_end_max_taper.z, point_3_end_max_taper.y],
+                [point_4_top.x, point_4_top.z, point_4_top.y], [point_2_top.x, point_2_top.z, point_2_top.y], [point_2_start_max_taper.x, point_2_start_max_taper.z, point_2_start_max_taper.y], [point_4_end_max_taper.x, point_4_end_max_taper.z, point_4_end_max_taper.y],
+                [point_1_start_max_taper.x, point_1_start_max_taper.z, point_1_start_max_taper.y], [point_3_end_max_taper.x, point_3_end_max_taper.z, point_3_end_max_taper.y], [point_3_end_inner.x, point_3_end_inner.z, point_3_end_inner.y], [point_1_start_inner.x, point_1_start_inner.z, point_1_start_inner.y],
+                [point_2_start_max_taper.x, point_2_start_max_taper.z, point_2_start_max_taper.y], [point_1_start_max_taper.x, point_1_start_max_taper.z, point_1_start_max_taper.y], [point_1_start_inner.x, point_1_start_inner.z, point_1_start_inner.y], [point_2_start_inner.x, point_2_start_inner.z, point_2_start_inner.y],
+                [point_3_end_max_taper.x, point_3_end_max_taper.z, point_3_end_max_taper.y], [point_4_end_max_taper.x, point_4_end_max_taper.z, point_4_end_max_taper.y], [point_4_end_inner.x, point_4_end_inner.z, point_4_end_inner.y], [point_3_end_inner.x, point_3_end_inner.z, point_3_end_inner.y],
+                [point_4_end_max_taper.x, point_4_end_max_taper.z, point_4_end_max_taper.y], [point_2_start_max_taper.x, point_2_start_max_taper.z, point_2_start_max_taper.y], [point_2_start_inner.x, point_2_start_inner.z, point_2_start_inner.y], [point_4_end_inner.x, point_4_end_inner.z, point_4_end_inner.y],
+                [point_1_start_inner.x, point_1_start_inner.z, point_1_start_inner.y], [point_2_start_inner.x, point_2_start_inner.z, point_2_start_inner.y], [point_4_end_inner.x, point_4_end_inner.z, point_4_end_inner.y], [point_3_end_inner.x, point_3_end_inner.z, point_3_end_inner.y]
             ]
             
         else:
-            nbv=24
+            vertices_per_segment=24
 
-            Deca = Vector(Norm.x*s_infa,Norm.y*s_infa,Norm.z*s_infa)
-            Decb = Vector(Norm.x*s_infb,Norm.y*s_infb,Norm.z*s_infb)
+            start_max_radius_offset = Vector(normal_vector.x*start_bottom_radius,normal_vector.y*start_bottom_radius,normal_vector.z*start_bottom_radius)
+            end_max_radius_offset = Vector(normal_vector.x*end_bottom_radius,normal_vector.y*end_bottom_radius,normal_vector.z*end_bottom_radius)
 
             # X Z Y
-            P_1t = Vtop+Dec
-            P_2t = Vtop-Dec
-            P_3t = V_Dir+Vtop+Dec
-            P_4t = V_Dir+Vtop-Dec
+            point_1_top = top_offset_vector+outer_radius_offset
+            point_2_top = top_offset_vector-outer_radius_offset
+            point_3_top = line_direction+top_offset_vector+outer_radius_offset
+            point_4_top = line_direction+top_offset_vector-outer_radius_offset
      
-            P_1i = VZa+Deca
-            P_2i = VZa-Deca
-            P_3i = VZb+V_Dir+Decb
-            P_4i = VZb+V_Dir-Decb
+            point_1_start_inner = start_height_vector+start_max_radius_offset
+            point_2_start_inner = start_height_vector-start_max_radius_offset
+            point_3_end_inner = end_height_vector+line_direction+end_max_radius_offset
+            point_4_end_inner = end_height_vector+line_direction-end_max_radius_offset
              
             """
             1) Top
@@ -1161,18 +1165,18 @@ class CustomSupportsReborn(Tool):
             6) Bottom
             """
             verts = [ # 6 faces with 4 corners each
-                [P_1t.x, P_1t.z, P_1t.y], [P_2t.x, P_2t.z, P_2t.y], [P_4t.x, P_4t.z, P_4t.y], [P_3t.x, P_3t.z, P_3t.y],
-                [P_1t.x, P_1t.z, P_1t.y], [P_3t.x, P_3t.z, P_3t.y], [P_3i.x, P_3i.z, P_3i.y], [P_1i.x, P_1i.z, P_1i.y],
-                [P_2t.x, P_2t.z, P_2t.y], [P_1t.x, P_1t.z, P_1t.y], [P_1i.x, P_1i.z, P_1i.y], [P_2i.x, P_2i.z, P_2i.y],
-                [P_3t.x, P_3t.z, P_3t.y], [P_4t.x, P_4t.z, P_4t.y], [P_4i.x, P_4i.z, P_4i.y], [P_3i.x, P_3i.z, P_3i.y],
-                [P_4t.x, P_4t.z, P_4t.y], [P_2t.x, P_2t.z, P_2t.y], [P_2i.x, P_2i.z, P_2i.y], [P_4i.x, P_4i.z, P_4i.y],
-                [P_1i.x, P_1i.z, P_1i.y], [P_2i.x, P_2i.z, P_2i.y], [P_4i.x, P_4i.z, P_4i.y], [P_3i.x, P_3i.z, P_3i.y]
+                [point_1_top.x, point_1_top.z, point_1_top.y], [point_2_top.x, point_2_top.z, point_2_top.y], [point_4_top.x, point_4_top.z, point_4_top.y], [point_3_top.x, point_3_top.z, point_3_top.y],
+                [point_1_top.x, point_1_top.z, point_1_top.y], [point_3_top.x, point_3_top.z, point_3_top.y], [point_3_end_inner.x, point_3_end_inner.z, point_3_end_inner.y], [point_1_start_inner.x, point_1_start_inner.z, point_1_start_inner.y],
+                [point_2_top.x, point_2_top.z, point_2_top.y], [point_1_top.x, point_1_top.z, point_1_top.y], [point_1_start_inner.x, point_1_start_inner.z, point_1_start_inner.y], [point_2_start_inner.x, point_2_start_inner.z, point_2_start_inner.y],
+                [point_3_top.x, point_3_top.z, point_3_top.y], [point_4_top.x, point_4_top.z, point_4_top.y], [point_4_end_inner.x, point_4_end_inner.z, point_4_end_inner.y], [point_3_end_inner.x, point_3_end_inner.z, point_3_end_inner.y],
+                [point_4_top.x, point_4_top.z, point_4_top.y], [point_2_top.x, point_2_top.z, point_2_top.y], [point_2_start_inner.x, point_2_start_inner.z, point_2_start_inner.y], [point_4_end_inner.x, point_4_end_inner.z, point_4_end_inner.y],
+                [point_1_start_inner.x, point_1_start_inner.z, point_1_start_inner.y], [point_2_start_inner.x, point_2_start_inner.z, point_2_start_inner.y], [point_4_end_inner.x, point_4_end_inner.z, point_4_end_inner.y], [point_3_end_inner.x, point_3_end_inner.z, point_3_end_inner.y]
             ]
         
         mesh.setVertices(numpy.asarray(verts, dtype=numpy.float32))
 
         indices = []
-        for i in range(0, nbv, 4): # All 6 quads (12 triangles)
+        for i in range(0, vertices_per_segment, 4): # All 6 quads (12 triangles)
             indices.append([i, i+2, i+1])
             indices.append([i, i+3, i+2])
         mesh.setIndices(numpy.asarray(indices, dtype=numpy.int32))
@@ -1213,7 +1217,6 @@ class CustomSupportsReborn(Tool):
         if new_value <= 0:
             return
         
-        #Logger.log('d', 's_value : ' + str(s_value))        
         self._support_size = new_value
         self._preferences.setValue("customsupportsreborn/support_size", new_value)
         log("d", f"_support_size being set to {new_value}")
@@ -1234,7 +1237,6 @@ class CustomSupportsReborn(Tool):
             log("i", "Tried to set SupportSizeMax to < 0")
             return
         
-        #Logger.log('d', 's_value : ' + str(s_value))        
         self._support_size_max = new_value
         self._preferences.setValue("customsupportsreborn/support_size_max", new_value)
         log("d", f"_support_size_max being set to {new_value}")

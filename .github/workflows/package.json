@@ -6,7 +6,7 @@
         "website": "http://github.com/Slashee-the-Cow/"
     },
     "description": "Originally by 5@xes - This plugin adds several custom supports you can use for your model instead of the support automatically added by Cura.\n\nGiven new life by Slashee the Cow so everyone can use this awesome tool.",
-    "display_name": "Calibration Shapes Reborn",
+    "display_name": "Custom Supports Reborn",
     "package_id": "CustomSupportsReborn",
     "package_type": "plugin",
     "package_version": "1.0.0",
