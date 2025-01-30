@@ -1,17 +1,17 @@
 name: "Cura-plugin release"
 
-on:
-  workflow_dispatch: # Allows manual triggering
+#on:
+#  workflow_dispatch: # Allows manual triggering
 
-# on:
-#   push:
-#     tags:
-#       - "v*"
+on:
+   push:
+     tags:
+       - "v*"
 #   pull_request:
 #     branches:
 #       - master
 #     types:
-#       - closed
+#      - closed
 
 jobs:
   create-curapackages:
