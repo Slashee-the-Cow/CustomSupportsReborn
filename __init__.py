@@ -1,32 +1,24 @@
+# Reborn version copyright 2025 Slashee the Cow
 # Copyright (c) 2022 5@xes
 # Initialy Based on the SupportBlocker plugin by Ultimaker B.V., and licensed under LGPLv3 or higher.
 
-VERSION_QT5 = False
-try:
-    from PyQt6.QtCore import QT_VERSION_STR
-except ImportError:
-    VERSION_QT5 = True
-    
-from . import CustomSupportsCylinder
-
+from . import CustomSupportsReborn
 from UM.i18n import i18nCatalog
-i18n_catalog = i18nCatalog("customsupport")
+
+i18n_catalog = i18nCatalog("customsupportsreborn")
 
 def getMetaData():
-    if not VERSION_QT5:
-        QmlFile="qml/qml_qt6/CustomSupport.qml"
-    else:
-        QmlFile="qml/qml_qt5/CustomSupport.qml"
-
+    """Tell Cura all about CustomSupportsReborn"""
     return {
         "tool": {
-            "name": i18n_catalog.i18nc("@label", "Custom Supports Cylinder"),
-            "description": i18n_catalog.i18nc("@info:tooltip", "Add 6 types of custom support"),
+            "name": i18n_catalog.i18nc("@tool:name", "Custom Supports Reborn"),
+            "description": i18n_catalog.i18nc("@tool:tooltip", "Add several types of custom support"),
             "icon": "tool_icon.svg",
-            "tool_panel": QmlFile,
+            "tool_panel": "qml/CustomSupportsReborn.qml",
             "weight": 8
         }
     }
 
 def register(app):
-    return { "tool": CustomSupportsCylinder.CustomSupportsCylinder() }
+    """Register tool so Cura can access it."""
+    return { "tool": CustomSupportsReborn.CustomSupportsReborn() }

@@ -1,0 +1,41 @@
+name: "Cura-plugin release"
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  create-curapackages:
+    name: "Tagged Release"
+    runs-on: "ubuntu-latest"
+
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          path: "repo"
+          submodules: "recursive"
+      - name: Create folder for files which make the cut
+        run: mkdir -p build
+      - name: Copy files needed for the build
+        working-directory: repo
+        run: |
+          cp -r resources/i18n ../build/resources
+          cp -r models ../build/
+          cp -r qml ../build/
+          cp __init__.py ../build/
+          cp CustomSupportsReborn.py ../build/
+          cp LICENSE ../build/
+          cp plugin.json ../build/
+          cp README.md ../build/
+          cp tool_icon.svg ../build/
+      - uses: fieldOfView/cura-plugin-packager-action@main
+        with:
+          source_folder: "build"
+          package_info_path: "repo/.github/workflows/package.json"
+      - uses: "marvinpinto/action-automatic-releases@latest"
+        with:
+          repo_token: "${{ secrets.GITHUB_TOKEN }}"
+          prerelease: false
+          files: |
+            *.curapackage

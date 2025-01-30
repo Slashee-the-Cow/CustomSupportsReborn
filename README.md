@@ -1,17 +1,15 @@
-# Custom Supports Plugin for Cura
+# Custom Supports Reborn
+A Cura plugin which lets you add several custom types of support instead of just a boring cube.  
 
-Cura plugin which enables you to add custom different support types. It was originaly based on the ***Support Eraser plugin*** code of *Ultimaker BV*. But instead of creating only a fixed sized cube **"anti_overhang_mesh"**, this plugin offer you the possibility to define a custom sized shape **"support_mesh"** element.
+Based on [Custom Support Cylinder](https://github.com/5axes/CustomSupportCylinder) by 5@xes and reborn so that I can keep this awesome plugin available to everyone.  
+Originaly based on the Support Eraser plugin built into Cura and develoed by UltiMaker.
 
-Source code on Github : [https://github.com/Ultimaker/Cura/tree/master/plugins/SupportEraser](https://github.com/Ultimaker/Cura/tree/master/plugins/SupportEraser)
+## Features
 
-This plugin offer now much more possibilities :
-----
-
-- Possibility to define cylindrical / squarred / custom by 2 points / tube / abutment support style / Freeform Support
-- Possibility to define the support size
-- Visualisation of the support on the total height
-- Possibility to add an angle to obtain a conical support
-- Possibility to limit the size of the bottom of the support in case of tapered support
+- Able to create cylindrical, squared / custom by 2 points / tube / abutment support style / Freeform Support
+- Set support size
+- Conical support is possible by defining an angle
+- Can limit the size of the bottom of the support in case of tapered support
 
 **New 2.4.0**
 
@@ -77,7 +75,7 @@ Select the type of support to create with the buttons in the support plugin inte
 
 - Before to slice your model, uncheck the "Generate Support" checkbox in the right panel **(if you want to use ONLY custom supports)**
 
->Note: it's easier to add/remove supports when you are in "Solid View" mode
+>Note: it's easier to add/remove supports when you are in the "Prepare" stage.
 
 
 ## Modifications
@@ -119,15 +117,3 @@ To create custom support you need to clic 2 points on the model.
 
 - Version 2.8.0 Add Define As Model For Cylindrical Model.
 - Version 2.8.1 Change Code for automatic orientation.
-
-# Youtube Video
-
-## Version 2.5.2
-[![Version 2.5.2](http://img.youtube.com/vi/lCSbLjEbc-E/0.jpg)](http://www.youtube.com/watch?v=lCSbLjEbc-E)
-## Version 2.5.5
-[![Version 2.5.5](http://img.youtube.com/vi/fMwHHQumd3o/0.jpg)](http://www.youtube.com/watch?v=fMwHHQumd3o)
-## Version 2.6.4
-[![Version 2.6.4](http://img.youtube.com/vi/mttGebG2k3o/0.jpg)](http://www.youtube.com/watch?v=mttGebG2k3o)
-## Version 2.7.1
-[![Version 2.7.1](http://img.youtube.com/vi/xLy8lSbEBqs/0.jpg)](https://www.youtube.com/watch?v=xLy8lSbEBqs)
-
