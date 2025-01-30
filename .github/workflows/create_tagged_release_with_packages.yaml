@@ -1,9 +1,17 @@
 name: "Cura-plugin release"
 
 on:
-  push:
-    tags:
-      - "v*"
+  workflow_dispatch: # Allows manual triggering
+
+# on:
+#   push:
+#     tags:
+#       - "v*"
+#   pull_request:
+#     branches:
+#       - master
+#     types:
+#       - closed
 
 jobs:
   create-curapackages:
