@@ -20,7 +20,7 @@
 import QtQuick 6.0
 import QtQuick.Controls 6.0
 
-import UM 1.7 as UM
+import UM 1.6 as UM
 import Cura 1.0 as Cura
 
 Item
@@ -44,31 +44,74 @@ Item
     property real supportSizeInnerValue: 0
     property real supportAngleValue: 0
 
+    function compareVersions(version1, version2) {
+        const v1 = String(version1).split(".");
+        const v2 = String(version2).split(".");
+
+        for (let i = 0; i < Math.max(v1.length, v2.length); i++) {
+            const num1 = parseInt(v1[i] || 0); // Handle missing components
+            const num2 = parseInt(v2[i] || 0);
+
+            if (num1 < num2) return -1;
+            if (num1 > num2) return 1;
+        }
+        return 0; // Versions are equal
+    }
+
+    function isVersion57OrGreater(){
+        return compareVersions(UM.Application.version, "5.7.0") >= 0;
+    }
+    
+
+    function getProperty(propertyName){
+        if(isVersion57OrGreater()){
+            return UM.Controller.properties.getValue(propertyName);
+        } else {
+            return UM.ActiveTool.properties.getValue(propertyName);
+        }
+    }
+
+    function setProperty(propertyName, value){
+        if(isVersion57OrGreater()){
+            return UM.Controller.setProperty(propertyName, value);
+        } else {
+            return UM.ActiveTool.setProperty(propertyName, value);
+        }
+    }
+
+    function triggerAction(action){
+        if(isVersion57OrGreater()){
+            return UM.Controller.triggerAction(action)
+        } else {
+            return UM.ActiveTool.triggerAction(action)
+        }
+    }
+
     Component.onCompleted: {
         // Pretty sure the buttons need their checked values done too. Can't hurt anyway. I hope.
-        cylinderButton.checked = UM.Controller.properties.getValue("SupportType") === supportTypeCylinder
-        tubeButton.checked = UM.Controller.properties.getValue("SupportType") === supportTypeTube
-        cubeButton.checked = UM.Controller.properties.getValue("SupportType") === supportTypeCube
-        abutmentButton.checked = UM.Controller.properties.getValue("SupportType") === supportTypeAbutment
-        lineButton.checked = UM.Controller.properties.getValue("SupportType") === supportTypeLine
-        modelButton.checked = UM.Controller.properties.getValue("SupportType") === supportTypeModel
+        cylinderButton.checked = getProperty("SupportType") === supportTypeCylinder
+        tubeButton.checked = getProperty("SupportType") === supportTypeTube
+        cubeButton.checked = getProperty("SupportType") === supportTypeCube
+        abutmentButton.checked = getProperty("SupportType") === supportTypeAbutment
+        lineButton.checked = getProperty("SupportType") === supportTypeLine
+        modelButton.checked = getProperty("SupportType") === supportTypeModel
 
-        supportSizeMaxValue = UM.Controller.properties.getValue("SupportSizeMax")
-        supportSizeValue = UM.Controller.properties.getValue("SupportSize")
-        supportSizeTextField.validator.top = supportSizeMaxValue
-        supportSizeInnerValue = UM.Controller.properties.getValue("SupportSizeInner")
+        supportSizeMaxValue = getProperty("SupportSizeMax")
+        supportSizeValue = getProperty("SupportSize")
+        //supportSizeTextField.validator.top = supportSizeMaxValue
+        supportSizeInnerValue = getProperty("SupportSizeInner")
         supportSizeInnerTextField.validator.top = supportSizeValue - 0.01
-        supportAngleValue = UM.Controller.properties.getValue("SupportAngle")
+        supportAngleValue = getProperty("SupportAngle")
 
-        supportYDirectionCheckbox.checked = UM.Controller.properties.getValue("SupportYDirection")
-        modelMirrorCheckbox.checked = UM.Controller.properties.getValue("ModelMirror")
-        modelOrientCheckbox.checked = UM.Controller.properties.getValue("ModelOrient")
-        modelScaleMainCheckbox.checked = UM.Controller.properties.getValue("ModelScaleMain")
-        abutmentEqualizeHeightsCheckbox.checked = UM.Controller.properties.getValue("AbutmentEqualizeHeights")
+        supportYDirectionCheckbox.checked = getProperty("SupportYDirection")
+        modelMirrorCheckbox.checked = getProperty("ModelMirror")
+        modelOrientCheckbox.checked = getProperty("ModelOrient")
+        modelScaleMainCheckbox.checked = getProperty("ModelScaleMain")
+        abutmentEqualizeHeightsCheckbox.checked = getProperty("AbutmentEqualizeHeights")
     }
     
     
-    //property var support_size: UM.Controller.properties.getValue("SupportSize")
+    //property var support_size: getProperty("SupportSize")
     property int localwidth: 110
 
     function setSupportType(type)
@@ -80,7 +123,7 @@ Item
         abutmentButton.checked = type === supportTypeAbutment
         lineButton.checked = type === supportTypeLine
         modelButton.checked = type === supportTypeModel
-        UM.Controller.setProperty("SupportType", type)
+        setProperty("SupportType", type)
     }
     
     Column
@@ -107,7 +150,7 @@ Item
                 property bool needBorder: true
                 checkable:true
                 onClicked: setSupportType(supportTypeCylinder)
-                //checked: UM.Controller.properties.getValue("SupportType") === supportTypeCylinder
+                //checked: getProperty("SupportType") === supportTypeCylinder
                 z: 3 // Depth position 
             }
 
@@ -123,7 +166,7 @@ Item
                 property bool needBorder: true
                 checkable:true
                 onClicked: setSupportType(supportTypeTube)
-                //checked: UM.Controller.properties.getValue("SupportType") === supportTypeTube
+                //checked: getProperty("SupportType") === supportTypeTube
                 z: 2 // Depth position 
             }
             
@@ -139,7 +182,7 @@ Item
                 property bool needBorder: true
                 checkable: true
                 onClicked: setSupportType(supportTypeCube)
-                //checked: UM.Controller.properties.getValue("SupportType") === supportTypeCube
+                //checked: getProperty("SupportType") === supportTypeCube
                 z: 1 // Depth position 
             }
 
@@ -162,7 +205,7 @@ Item
                 property bool needBorder: true
                 checkable: true
                 onClicked: setSupportType(supportTypeAbutment)
-                //checked: UM.Controller.properties.getValue("SupportType") === supportTypeAbutment
+                //checked: getProperty("SupportType") === supportTypeAbutment
                 z: 3 // Depth position 
             }
 
@@ -178,7 +221,7 @@ Item
                 property bool needBorder: true
                 checkable:true
                 onClicked: setSupportType(supportTypeLine)
-                //checked: UM.Controller.properties.getValue("SupportType") === supportTypeLine
+                //checked: getProperty("SupportType") === supportTypeLine
                 z: 2 // Depth position 
             }
 
@@ -194,7 +237,7 @@ Item
                 property bool needBorder: true
                 checkable:true
                 onClicked: setSupportType(supportTypeModel)
-                //checked: UM.Controller.properties.getValue("SupportType") === supportTypeModel
+                //checked: getProperty("SupportType") === supportTypeModel
                 z: 1 // Depth position 
             }
         }
@@ -282,11 +325,11 @@ Item
             Connections{
                 target: root
                 function onSupportSizeMaxValueChanged() {
-                    supportSizeTextField.validator.top = root.supportSizeMaxValue;
+                    //supportSizeTextField.validator.top = root.supportSizeMaxValue;
                     if(root.supportSizeValue > root.supportSizeMaxValue){
                         root.supportSizeValue = root.supportSizeMaxValue;
                         supportSizeTextField.displaySupportSize = root.supportSizeValue.toString();
-                        UM.Controller.setProperty("SupportSize", root.supportSizeValue)
+                        setProperty("SupportSize", root.supportSizeValue)
                     }
                 }
             }
@@ -322,12 +365,12 @@ Item
                         displaySupportSize = root.supportSizeValue.toString()
                         return
                     } else if(text_as_num > root.supportSizeMaxValue) {
-                        displaySupportSize = ""
-                        displaySupportSize = root.supportSizeMaxValue.toString()
-                        text_as_num = root.supportSizeMaxValue
+                        root.supportSizeMaxValue = text_as_num;
+                        supportSizeMaxTextField.displaySupportSizeMax = root.supportSizeMaxValue.toString();
+                        setProperty("SupportSizeMax", root.supportSizeMaxValue)
                     } else {
                         root.supportSizeValue = text_as_num;
-                        UM.Controller.setProperty("SupportSize", text_as_num);
+                        setProperty("SupportSize", text_as_num);
                         displaySupportSize = text_as_num.toString();
                     }
                 }
@@ -343,6 +386,7 @@ Item
             unit: "mm"
             visible: !modelButton.checked
             text: displaySupportSizeMax
+
             Component.onCompleted: {
                 displaySupportSizeMax = root.supportSizeMaxValue.toString()
             }
@@ -378,7 +422,7 @@ Item
                         return
                     } {
                         root.supportSizeMaxValue = text_as_num
-                        UM.Controller.setProperty("SupportSizeMax", text_as_num)
+                        setProperty("SupportSizeMax", text_as_num)
                         displaySupportSizeMax = text_as_num.toString()
                     }
             }
@@ -400,11 +444,11 @@ Item
             width: localwidth
             height: UM.Theme.getSize("setting_control").height
             visible: modelButton.checked
-            Component.onCompleted: currentIndex = find(UM.Controller.properties.getValue("SupportSubtype"))
+            Component.onCompleted: currentIndex = find(getProperty("SupportSubtype"))
             
             onCurrentIndexChanged: 
             { 
-                UM.Controller.setProperty("SupportSubtype", cbItems.get(currentIndex).text)
+                setProperty("SupportSubtype", cbItems.get(currentIndex).text)
             }
         }    
                 
@@ -425,7 +469,7 @@ Item
                     if(root.supportSizeInnerValue >= root.supportSizeValue){
                         root.supportSizeInnerValue = root.supportSizeValue - 0.01;
                         supportSizeInnerTextField.displaySupportSizeInner = root.supportSizeInnerValue.toString();
-                        UM.Controller.setProperty("SupportSizeInner", root.supportSizeInnerValue)
+                        setProperty("SupportSizeInner", root.supportSizeInnerValue)
                     }
                 }
             }
@@ -468,7 +512,7 @@ Item
                             text_as_num = root.supportSizeValue - 0.01
                         }
                         root.supportSizeInnerValue = text_as_num
-                        UM.Controller.setProperty("SupportSizeInner", text_as_num)
+                        setProperty("SupportSizeInner", text_as_num)
                         displaySupportSizeInner = text_as_num.toString()
                     }
                 }
@@ -512,7 +556,7 @@ Item
                         displaySupportAngle = root.supportAngleValue.toString()
                     } else {
                         root.supportAngleValue = text_as_num
-                        UM.Controller.setProperty("SupportAngle", text_as_num)
+                        setProperty("SupportAngle", text_as_num)
                         displaySupportAngle = text_as_num.toString()
                     }
                 }
@@ -539,7 +583,7 @@ Item
             visible: abutmentButton.checked || modelButton.checked 
 
             //checked: withActiveTool(function(tool) {return tool.supportYDirection})
-            onClicked: UM.Controller.setProperty("SupportYDirection", checked)
+            onClicked: setProperty("SupportYDirection", checked)
         }
         
         UM.CheckBox
@@ -552,7 +596,7 @@ Item
             visible: modelButton.checked && !modelOrientCheckbox.checked
 
             //checked: withActiveTool(function(tool) {return tool.modelMirror})
-            onClicked: UM.Controller.setProperty("ModelMirror", checked)
+            onClicked: setProperty("ModelMirror", checked)
             
         }        
         UM.CheckBox
@@ -565,7 +609,7 @@ Item
             visible: modelButton.checked
 
             //checked: withActiveTool(function(tool) {return tool.modelOrient})
-            onClicked: UM.Controller.setProperty("ModelOrient", checked)
+            onClicked: setProperty("ModelOrient", checked)
             
         }    
         UM.CheckBox
@@ -578,7 +622,7 @@ Item
             visible: modelButton.checked
 
             //checked: withActiveTool(function(tool) {return tool.modelScaleMain})
-            onClicked: UM.Controller.setProperty("ModelScaleMain", checked)
+            onClicked: setProperty("ModelScaleMain", checked)
         }    
         UM.CheckBox
         {
@@ -590,7 +634,7 @@ Item
             visible: abutmentButton.checked
 
             //checked: withActiveTool(function(tool) {return abutmentEqualizeHeights})
-            onClicked: UM.Controller.setProperty("AbutmentEqualizeHeights", checked)
+            onClicked: setProperty("AbutmentEqualizeHeights", checked)
         }
         
 
@@ -615,6 +659,6 @@ Item
         width: UM.Theme.getSize("setting_control").width
         height: UM.Theme.getSize("setting_control").height        
         text: catalog.i18nc("panel:remove_all", "Remove All")
-        onClicked: UM.Controller.triggerAction("removeAllSupportMesh")
+        onClicked: triggerAction("removeAllSupportMesh")
     }
 }

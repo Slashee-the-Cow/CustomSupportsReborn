@@ -46,7 +46,7 @@
 #--------------------------------------------------------------------------------------------
 # Release history for Reborn version by Slashee the Cow 2025-
 #--------------------------------------------------------------------------------------------
-# V1.0.0 - Initial release.
+# v1.0.0 - Initial release.
 #   Reverted everything to v2.8.0 manually as the version in the master branch seems to contain some "work in progress" stuff.
 #   Renamed everything. Including internally so it doesn't compete with 5@xes' verison if you still have that installed.
 #   Futzed around with the translation system and ended up with basically the same thing. If someone wants to translate it, get in touch!
@@ -55,6 +55,9 @@
 #   Changed the icon to illustrate it does more than cylinders. Now it looks like it does rockets.
 #   Renamed "Freeform" to "Model" and "Custom" to "Line" and swapped their positions.
 #   Input validation in the text fields! Resetting if you put in something invalid! Preventing bugs from conflicting settings!
+# v1.0.1 - 2025-02-05
+#   Fixed control panel for Cura versions < 5.7.
+#   Control panel input validation now a little less strict. You can set the support size to above the max size now and it'll change the max size to match.
 
 from PyQt6.QtCore import Qt, QTimer, QObject, QVariant, pyqtProperty
 from PyQt6.QtQml import qmlRegisterType
