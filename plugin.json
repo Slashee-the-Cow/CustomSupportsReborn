@@ -1,9 +1,10 @@
 {
     "name": "Custom Supports Reborn",
     "author": "Slashee the Cow",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "description": "Originally by 5axes - Gives you several different kinds of custom support to add to your scene.",
     "i18n-catalog": "customsupportsreborn",
     "minimum_cura_version": "5.0",
-    "api": 8
+    "api": 8,
+    "supported_sdk_versions": ["8.0.0"]
 }
