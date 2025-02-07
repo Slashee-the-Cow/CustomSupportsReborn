@@ -58,6 +58,9 @@
 # v1.0.1 - 2025-02-05
 #   Fixed control panel for Cura versions < 5.7.
 #   Control panel input validation now a little less strict. You can set the support size to above the max size now and it'll change the max size to match.
+# v1.0.2
+#   Changed icons for abutment and model support types.
+#   Model combo box now remembers what model you had selected.
 
 from PyQt6.QtCore import Qt, QTimer, QObject, QVariant, pyqtProperty
 from PyQt6.QtQml import qmlRegisterType
@@ -67,8 +70,8 @@ import math
 import numpy
 import os.path
 import trimesh
-
-from typing import Optional, List
+import traceback
+import io
 
 from cura.CuraApplication import CuraApplication
 from cura.PickingPass import PickingPass
@@ -98,20 +101,16 @@ from UM.Settings.SettingInstance import SettingInstance
 from UM.Resources import Resources
 from UM.i18n import i18nCatalog
 
-#i18n_cura_catalog = i18nCatalog("cura")
-#i18n_printer_catalog = i18nCatalog("fdmprinter.def.json")
-#i18n_extrud_catalog = i18nCatalog("fdmextruder.def.json")
-
 #Resources.addSearchPath(
 #    os.path.join(os.path.abspath(os.path.dirname(__file__)))
 #)  # Plugin translation file import
 
-#i18n_catalog = i18nCatalog("customsupportsreborn")
+i18n_catalog = i18nCatalog("customsupportsreborn")
 
 #if i18n_catalog.hasTranslationLoaded():
 #    Logger.log("i", "Custom Supports Reborn translation loaded")
 
-DEBUG_MODE = False
+DEBUG_MODE = True
 
 def log(level, message):
     """Wrapper function for logging messages using Cura's Logger, but with debug mode so as not to spam you."""
@@ -135,6 +134,13 @@ SUPPORT_TYPE_ABUTMENT = "abutment"
 SUPPORT_TYPE_LINE = "line"
 SUPPORT_TYPE_MODEL = "model"
 
+def log_stack(message="Stack Trace"):
+    """Logs the current stack using Cura's Logger."""
+    with io.StringIO() as f:
+        traceback.print_stack(file=f)  # Print the current stack
+        tb_string = f.getvalue()
+    Logger.log("d", f"{message}:\n{tb_string}")  # Log with a descriptive message
+
 class CustomSupportsReborn(Tool):
 
     #_translations = CustomSupportsRebornTranslations()
@@ -152,9 +158,9 @@ class CustomSupportsReborn(Tool):
 
         self._catalog = i18nCatalog("customsupportsreborn")
 
-        self.setExposedProperties("SupportType", "SupportSubtype", "SupportSize", "SupportSizeMax", "SupportSizeInner", "SupportAngle", "SupportYDirection", "AbutmentEqualizeHeights", "ModelScaleMain", "ModelOrient", "ModelMirror", "PanelRemoveAllText")
+        self.setExposedProperties("SupportType", "SupportSubtype", "SupportSubtypeIndex", "SupportSize", "SupportSizeMax", "SupportSizeInner", "SupportAngle", "SupportYDirection", "AbutmentEqualizeHeights", "ModelScaleMain", "ModelOrient", "ModelMirror", "PanelRemoveAllText")
 
-        self._supports_created: List[SceneNode] = []
+        self._supports_created: list[SceneNode] = []
         
         self._line_points: int = 0  
         self._support_heights: float = 0.0
@@ -170,10 +176,11 @@ class CustomSupportsReborn(Tool):
         self._model_orient: bool = False
         self._model_mirror: bool = False
         self._support_type: str = 'cylinder'
+        self._support_subtype_index = 0
         self._support_subtype: str = 'cross'
         self._model_hide_message:bool = False # To avoid message 
         self._panel_remove_all_text: str = self._catalog.i18nc("panel:remove_all", "Remove All")
-        
+
         # Shortcut
         self._shortcut_key: Qt.Key = Qt.Key.Key_F
             
@@ -210,6 +217,7 @@ class CustomSupportsReborn(Tool):
         self._preferences.addPreference("customsupportsreborn/model_mirror", False)
         self._preferences.addPreference("customsupportsreborn/support_type", SUPPORT_TYPE_CYLINDER)
         self._preferences.addPreference("customsupportsreborn/support_subtype", "cross")
+        self._preferences.addPreference("customsupportsreborn/support_subtype_index", 0)
         
         # convert as float to avoid further issue
         self._support_size = float(self._preferences.getValue("customsupportsreborn/support_size"))
@@ -226,13 +234,14 @@ class CustomSupportsReborn(Tool):
         self._support_type = str(self._preferences.getValue("customsupportsreborn/support_type"))
         # Sub type for Free Form support
         self._support_subtype = str(self._preferences.getValue("customsupportsreborn/support_subtype"))
+        self._support_subtype_index = int(self._preferences.getValue("customsupportsreborn/support_subtype_index"))
 
                 
     def event(self, event):
         super().event(event)
         modifiers = QApplication.keyboardModifiers()
         ctrl_is_active = modifiers & Qt.KeyboardModifier.ControlModifier
-        shift_is_active = modifiers & Qt.KeyboardModifier.ShiftModifier
+        # shift_is_active = modifiers & Qt.KeyboardModifier.ShiftModifier
         alt_is_active = modifiers & Qt.KeyboardModifier.AltModifier
 
         
@@ -523,10 +532,10 @@ class CustomSupportsReborn(Tool):
 
     # Source code from MeshTools Plugin 
     # Copyright (c) 2020 Aldo Hoeben / fieldOfView
-    def _getAllSelectedNodes(self) -> List[SceneNode]:
+    def _getAllSelectedNodes(self) -> list[SceneNode]:
         selection = Selection.getAllSelectedObjects()[:]
         if selection:
-            deep_selection = []  # type: List[SceneNode]
+            deep_selection = []  # type: list[SceneNode]
             for selected_node in selection:
                 if selected_node.hasChildren():
                     deep_selection = deep_selection + selected_node.getAllChildren()
@@ -1311,6 +1320,7 @@ class CustomSupportsReborn(Tool):
     supportType = property(getSupportType, setSupportType)
  
     def getSupportSubtype(self) -> str:
+        log_stack(f"CustomSupportsReborn: Stack for _support_subtype being read as {self._support_subtype}")
         # Logger.log('d', 'Set SubType : ' + str(self._SubType))  
         return self._support_subtype
     
@@ -1318,10 +1328,25 @@ class CustomSupportsReborn(Tool):
         self._support_subtype = new_type
         # Logger.log('d', 'Get SubType : ' + str(SubType))   
         self._preferences.setValue("customsupportsreborn/support_subtype", new_type)
+        log_stack(f"CustomSupportsReborn: Stack for _support_subtype being set to {new_type}")
         log("d", f"_support_subtype being set to {new_type}")
         self.propertyChanged.emit()
 
     supportSubtype = property(getSupportSubtype, setSupportSubtype)
+
+    def getSupportSubtypeIndex(self) -> int:
+        log_stack(f"CustomSupportsReborn: Stack for _support_subtype_index being read as {self._support_subtype_index}")
+        return self._support_subtype_index
+    
+    def setSupportSubtypeIndex(self, new_index: int) -> None:
+        self._support_subtype_index = new_index
+        # Logger.log('d', 'Get SubType : ' + str(SubType))   
+        # log("d", f"_support_subtype_index being set to {new_index}")
+        log_stack(f"CustomSupportsReborn: Stack for _support_subtype_index being set to {new_index}")
+        self._preferences.setValue("customsupportsreborn/support_subtype_index", new_index)
+        self.propertyChanged.emit()
+
+    supportSubtypeIndex = property(getSupportSubtypeIndex, setSupportSubtypeIndex)
         
     def getSupportYDirection(self) -> bool:
         return self._support_y_direction

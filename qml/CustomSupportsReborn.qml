@@ -43,6 +43,7 @@ Item
     property real supportSizeMaxValue: 0
     property real supportSizeInnerValue: 0
     property real supportAngleValue: 0
+    property int supportSubtypeIndex: 0
 
     function compareVersions(version1, version2) {
         const v1 = String(version1).split(".");
@@ -59,7 +60,13 @@ Item
     }
 
     function isVersion57OrGreater(){
-        return compareVersions(UM.Application.version, "5.7.0") >= 0;
+        let version = CuraApplication ? CuraApplication.version : (UM.Application ? UM.Application.version : null);
+        if(version){
+            return compareVersions(CuraApplication.version || (UM.Application && UM.Application.version), "5.7.0") >= 0;
+        } else {
+            return False
+        }
+        
     }
     
 
@@ -102,6 +109,8 @@ Item
         supportSizeInnerValue = getProperty("SupportSizeInner")
         supportSizeInnerTextField.validator.top = supportSizeValue - 0.01
         supportAngleValue = getProperty("SupportAngle")
+        supportSubtypeIndex = getProperty("SupportSubtypeIndex")
+
 
         supportYDirectionCheckbox.checked = getProperty("SupportYDirection")
         modelMirrorCheckbox.checked = getProperty("ModelMirror")
@@ -429,10 +438,10 @@ Item
         }
 
         ComboBox {
-            id: modelComboType
-            objectName: "Support_Subtype"
+            id: modelSubtype
+            property int currentIndexDisplay: 0
             model: ListModel {
-               id: cbItems
+               id: subtypeItems
                ListElement { text: "cross"}
                ListElement { text: "section"}
                ListElement { text: "pillar"}
@@ -441,16 +450,25 @@ Item
                ListElement { text: "t-support"}
                ListElement { text: "custom"}
             }
+            currentIndex: currentIndexDisplay
             width: localwidth
             height: UM.Theme.getSize("setting_control").height
             visible: modelButton.checked
-            Component.onCompleted: currentIndex = find(getProperty("SupportSubtype"))
+            Component.onCompleted: {
+                modelSubtype.currentIndexDisplay = root.supportSubtypeIndex;
+                modelSubtype.update()
+            }
             
             onCurrentIndexChanged: 
             { 
-                setProperty("SupportSubtype", cbItems.get(currentIndex).text)
+                root.supportSubtypeIndex = modelSubtype.currentIndex
+                modelSubtype.currentIndexDisplay = modelSubtype.currentIndex
+                setProperty("SupportSubtype", subtypeItems.get(currentIndex).text)
+                setProperty("SupportSubtypeIndex", modelSubtype.currentIndex)
             }
         }    
+
+        
                 
         UM.TextFieldWithUnit
         {
