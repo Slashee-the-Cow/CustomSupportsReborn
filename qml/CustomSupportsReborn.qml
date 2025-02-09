@@ -11,7 +11,7 @@
 //   "abutmentEqualizeHeights"   : Equalize heights (Abutment)
 //   "modelScaleMain"            : Scale Main direction (Model)
 //   "supportType"               : Support Type ( Cylinder/Tube/Cube/Abutment/Line/Model ) 
-//   "supportSubtype"            : Support model Type ( Cross/Section/Pillar/Bridge/Custom ) 
+//   "modelSubtype"            : Support model Type ( Cross/Section/Pillar/Bridge/Custom ) 
 //   "modelOrient"               : Support Automatic Orientation for model Type
 //   "modelMirror"               : Support Mirror for model Type
 //   "panelRemoveAllText"        : Text for the Remove All Button
@@ -21,7 +21,7 @@ import QtQuick 6.0
 import QtQuick.Controls 6.0
 
 import UM 1.6 as UM
-import Cura 1.0 as Cura
+import Cura 1.1 as Cura
 
 Item
 {
@@ -43,7 +43,14 @@ Item
     property real supportSizeMaxValue: 0
     property real supportSizeInnerValue: 0
     property real supportAngleValue: 0
-    property int supportSubtypeIndex: 0
+
+    function getCuraVersion(){
+        if(CuraApplication.version){
+            return CuraApplication.version()
+        } else {
+            return UM.Application.version
+        }
+    }
 
     function compareVersions(version1, version2) {
         const v1 = String(version1).split(".");
@@ -60,9 +67,10 @@ Item
     }
 
     function isVersion57OrGreater(){
-        let version = CuraApplication ? CuraApplication.version : (UM.Application ? UM.Application.version : null);
+        //let version = CuraApplication ? CuraApplication.version() : (UM.Application ? UM.Application.version : null);
+        let version = getCuraVersion()
         if(version){
-            return compareVersions(CuraApplication.version || (UM.Application && UM.Application.version), "5.7.0") >= 0;
+            return compareVersions(version, "5.7.0") >= 0;
         } else {
             return False
         }
@@ -94,8 +102,10 @@ Item
         }
     }
 
-    Component.onCompleted: {
+
+    function updateUI(){
         // Pretty sure the buttons need their checked values done too. Can't hurt anyway. I hope.
+
         cylinderButton.checked = getProperty("SupportType") === supportTypeCylinder
         tubeButton.checked = getProperty("SupportType") === supportTypeTube
         cubeButton.checked = getProperty("SupportType") === supportTypeCube
@@ -109,16 +119,18 @@ Item
         supportSizeInnerValue = getProperty("SupportSizeInner")
         supportSizeInnerTextField.validator.top = supportSizeValue - 0.01
         supportAngleValue = getProperty("SupportAngle")
-        supportSubtypeIndex = getProperty("SupportSubtypeIndex")
-
 
         supportYDirectionCheckbox.checked = getProperty("SupportYDirection")
         modelMirrorCheckbox.checked = getProperty("ModelMirror")
         modelOrientCheckbox.checked = getProperty("ModelOrient")
         modelScaleMainCheckbox.checked = getProperty("ModelScaleMain")
         abutmentEqualizeHeightsCheckbox.checked = getProperty("AbutmentEqualizeHeights")
+        modelSubtype.currentIndex = modelSubtype.find(getProperty("ModelSubtype"))
     }
     
+    Component.onCompleted: {    
+        updateUI();
+    }
     
     //property var support_size: getProperty("SupportSize")
     property int localwidth: 110
@@ -439,7 +451,6 @@ Item
 
         ComboBox {
             id: modelSubtype
-            property int currentIndexDisplay: 0
             model: ListModel {
                id: subtypeItems
                ListElement { text: "cross"}
@@ -450,23 +461,16 @@ Item
                ListElement { text: "t-support"}
                ListElement { text: "custom"}
             }
-            currentIndex: currentIndexDisplay
             width: localwidth
             height: UM.Theme.getSize("setting_control").height
             visible: modelButton.checked
             Component.onCompleted: {
-                modelSubtype.currentIndexDisplay = root.supportSubtypeIndex;
-                modelSubtype.update()
             }
             
-            onCurrentIndexChanged: 
-            { 
-                root.supportSubtypeIndex = modelSubtype.currentIndex
-                modelSubtype.currentIndexDisplay = modelSubtype.currentIndex
-                setProperty("SupportSubtype", subtypeItems.get(currentIndex).text)
-                setProperty("SupportSubtypeIndex", modelSubtype.currentIndex)
+            onActivated: {
+                setProperty("ModelSubtype", subtypeItems.get(currentIndex).text);
             }
-        }    
+        }
 
         
                 

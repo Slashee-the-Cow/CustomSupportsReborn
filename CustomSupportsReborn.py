@@ -70,8 +70,6 @@ import math
 import numpy
 import os.path
 import trimesh
-import traceback
-import io
 
 from cura.CuraApplication import CuraApplication
 from cura.PickingPass import PickingPass
@@ -110,7 +108,7 @@ i18n_catalog = i18nCatalog("customsupportsreborn")
 #if i18n_catalog.hasTranslationLoaded():
 #    Logger.log("i", "Custom Supports Reborn translation loaded")
 
-DEBUG_MODE = True
+DEBUG_MODE = False
 
 def log(level, message):
     """Wrapper function for logging messages using Cura's Logger, but with debug mode so as not to spam you."""
@@ -134,18 +132,10 @@ SUPPORT_TYPE_ABUTMENT = "abutment"
 SUPPORT_TYPE_LINE = "line"
 SUPPORT_TYPE_MODEL = "model"
 
-def log_stack(message="Stack Trace"):
-    """Logs the current stack using Cura's Logger."""
-    with io.StringIO() as f:
-        traceback.print_stack(file=f)  # Print the current stack
-        tb_string = f.getvalue()
-    Logger.log("d", f"{message}:\n{tb_string}")  # Log with a descriptive message
-
 class CustomSupportsReborn(Tool):
 
     #_translations = CustomSupportsRebornTranslations()
     #plugin_name = "@CustomSupportsReborn:"
-    #propertyChanged = pyqtSignal(str)
 
     def __init__(self):
        
@@ -158,7 +148,7 @@ class CustomSupportsReborn(Tool):
 
         self._catalog = i18nCatalog("customsupportsreborn")
 
-        self.setExposedProperties("SupportType", "SupportSubtype", "SupportSubtypeIndex", "SupportSize", "SupportSizeMax", "SupportSizeInner", "SupportAngle", "SupportYDirection", "AbutmentEqualizeHeights", "ModelScaleMain", "ModelOrient", "ModelMirror", "PanelRemoveAllText")
+        self.setExposedProperties("SupportType", "ModelSubtype", "SupportSize", "SupportSizeMax", "SupportSizeInner", "SupportAngle", "SupportYDirection", "AbutmentEqualizeHeights", "ModelScaleMain", "ModelOrient", "ModelMirror", "PanelRemoveAllText")
 
         self._supports_created: list[SceneNode] = []
         
@@ -175,9 +165,8 @@ class CustomSupportsReborn(Tool):
         self._model_scale_main: bool = True
         self._model_orient: bool = False
         self._model_mirror: bool = False
-        self._support_type: str = 'cylinder'
-        self._support_subtype_index = 0
-        self._support_subtype: str = 'cross'
+        self._support_type: str = SUPPORT_TYPE_CYLINDER
+        self._model_subtype: str = "cross"
         self._model_hide_message:bool = False # To avoid message 
         self._panel_remove_all_text: str = self._catalog.i18nc("panel:remove_all", "Remove All")
 
@@ -216,8 +205,7 @@ class CustomSupportsReborn(Tool):
         self._preferences.addPreference("customsupportsreborn/model_orient", False)
         self._preferences.addPreference("customsupportsreborn/model_mirror", False)
         self._preferences.addPreference("customsupportsreborn/support_type", SUPPORT_TYPE_CYLINDER)
-        self._preferences.addPreference("customsupportsreborn/support_subtype", "cross")
-        self._preferences.addPreference("customsupportsreborn/support_subtype_index", 0)
+        self._preferences.addPreference("customsupportsreborn/model_subtype", "cross")
         
         # convert as float to avoid further issue
         self._support_size = float(self._preferences.getValue("customsupportsreborn/support_size"))
@@ -233,8 +221,7 @@ class CustomSupportsReborn(Tool):
         # convert as string to avoid further issue
         self._support_type = str(self._preferences.getValue("customsupportsreborn/support_type"))
         # Sub type for Free Form support
-        self._support_subtype = str(self._preferences.getValue("customsupportsreborn/support_subtype"))
-        self._support_subtype_index = int(self._preferences.getValue("customsupportsreborn/support_subtype_index"))
+        self._model_subtype = str(self._preferences.getValue("customsupportsreborn/model_subtype"))
 
                 
     def event(self, event):
@@ -373,7 +360,7 @@ class CustomSupportsReborn(Tool):
         elif self._support_type == SUPPORT_TYPE_MODEL:
             # Cube creation Size , length
             mesh = MeshBuilder()  
-            model_definition_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "models", self._support_subtype + ".stl")
+            model_definition_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "models", self._model_subtype + ".stl")
             # Logger.log('d', 'Model_definition_path : ' + str(model_definition_path)) 
             load_mesh = trimesh.load(model_definition_path)
             origin = [0, 0, 0]
@@ -1231,10 +1218,10 @@ class CustomSupportsReborn(Tool):
         
         self._support_size = new_value
         self._preferences.setValue("customsupportsreborn/support_size", new_value)
-        log("d", f"_support_size being set to {new_value}")
+        log("d", f"CustomSupportsReborn._support_size being set to {new_value}")
         self.propertyChanged.emit()
     
-    supportSize = property(getSupportSize, setSupportSize)
+    #supportSize = property(getSupportSize, setSupportSize)
 
     def getSupportSizeMax(self) -> float:
         return self._support_size_max
@@ -1251,10 +1238,10 @@ class CustomSupportsReborn(Tool):
         
         self._support_size_max = new_value
         self._preferences.setValue("customsupportsreborn/support_size_max", new_value)
-        log("d", f"_support_size_max being set to {new_value}")
+        log("d", f"CustomSupportsReborn._support_size_max being set to {new_value}")
         self.propertyChanged.emit()
     
-    supportSizeMax = property(getSupportSizeMax, setSupportSizeMax)
+    #supportSizeMax = property(getSupportSizeMax, setSupportSizeMax)
         
     def getSupportSizeInner(self) -> float:
         return self._support_size_inner
@@ -1273,10 +1260,10 @@ class CustomSupportsReborn(Tool):
         #Logger.log('d', 's_value : ' + str(s_value))        
         self._support_size_inner = new_value
         self._preferences.setValue("customsupportsreborn/support_size_inner", new_value)
-        log("d", f"_support_size_inner being set to {new_value}")
+        log("d", f"CustomSupportsReborn._support_size_inner being set to {new_value}")
         self.propertyChanged.emit()
     
-    supportSizeInner = property(getSupportSizeInner, setSupportSizeInner)
+    #supportSizeInner = property(getSupportSizeInner, setSupportSizeInner)
         
     def getSupportAngle(self) -> float:
         return self._support_angle
@@ -1293,60 +1280,58 @@ class CustomSupportsReborn(Tool):
         # Logger.log('d', 's_value : ' + str(s_value))        
         self._support_angle = new_value
         self._preferences.setValue("customsupportsreborn/support_angle", new_value)
-        log("d", f"_support_angle being set to {new_value}")
+        log("d", f"CustomSupportsReborn._support_angle being set to {new_value}")
         self.propertyChanged.emit()
 
-    supportAngle = property(getSupportAngle, setSupportAngle)
+    #supportAngle = property(getSupportAngle, setSupportAngle)
  
     def getPanelRemoveAllText(self) -> str:
         return self._panel_remove_all_text
     
     def setPanelRemoveAllText(self, new_text: str) -> None:
         self._panel_remove_all_text = str(new_text)
-        log("d", f"_panel_remove_all_text being set to {new_text}")
+        log("d", f"CustomSupporsReborn._panel_remove_all_text being set to {new_text}")
         self.propertyChanged.emit()
 
-    panelRemoveAllText = property(getPanelRemoveAllText, setPanelRemoveAllText)
+    #panelRemoveAllText = property(getPanelRemoveAllText, setPanelRemoveAllText)
         
     def getSupportType(self) -> str:
         return self._support_type
     
     def setSupportType(self, new_type: str) -> None:
         self._support_type = new_type
-        log("d", f"_support_type being set to {new_type}")
+        log("d", f"CustomSupportsReborn._support_type being set to {new_type}")
         self._preferences.setValue("customsupportsreborn/support_type", new_type)
         self.propertyChanged.emit()
 
-    supportType = property(getSupportType, setSupportType)
+    #supportType = property(getSupportType, setSupportType)
  
-    def getSupportSubtype(self) -> str:
-        log_stack(f"CustomSupportsReborn: Stack for _support_subtype being read as {self._support_subtype}")
+    def getModelSubtype(self) -> str:
         # Logger.log('d', 'Set SubType : ' + str(self._SubType))  
-        return self._support_subtype
+        return self._model_subtype
     
-    def setSupportSubtype(self, new_type: str) -> None:
-        self._support_subtype = new_type
+    def setModelSubtype(self, new_type: str) -> None:
+        self._model_subtype = new_type
         # Logger.log('d', 'Get SubType : ' + str(SubType))   
-        self._preferences.setValue("customsupportsreborn/support_subtype", new_type)
-        log_stack(f"CustomSupportsReborn: Stack for _support_subtype being set to {new_type}")
-        log("d", f"_support_subtype being set to {new_type}")
+        self._preferences.setValue("customsupportsreborn/model_subtype", new_type)
+        log("d", f"CustomSupportsReborn._model_subtype being set to {new_type}")
         self.propertyChanged.emit()
 
-    supportSubtype = property(getSupportSubtype, setSupportSubtype)
+    # modelSubtype = property(getModelSubtype, setModelSubtype)
 
-    def getSupportSubtypeIndex(self) -> int:
-        log_stack(f"CustomSupportsReborn: Stack for _support_subtype_index being read as {self._support_subtype_index}")
-        return self._support_subtype_index
+    """def getModelSubtypeIndex(self) -> int:
+        log_stack(f"CustomSupportsReborn: Stack for _model_subtype_index being read as {self._model_subtype_index}")
+        return self._model_subtype_index
     
-    def setSupportSubtypeIndex(self, new_index: int) -> None:
-        self._support_subtype_index = new_index
+    def setModelSubtypeIndex(self, new_index: int) -> None:
+        self._model_subtype_index = new_index
         # Logger.log('d', 'Get SubType : ' + str(SubType))   
-        # log("d", f"_support_subtype_index being set to {new_index}")
-        log_stack(f"CustomSupportsReborn: Stack for _support_subtype_index being set to {new_index}")
-        self._preferences.setValue("customsupportsreborn/support_subtype_index", new_index)
+        # log("d", f"_model_subtype_index being set to {new_index}")
+        log_stack(f"CustomSupportsReborn: Stack for _model_subtype_index being set to {new_index}")
+        self._preferences.setValue("customsupportsreborn/model_subtype_index", new_index)
         self.propertyChanged.emit()
 
-    supportSubtypeIndex = property(getSupportSubtypeIndex, setSupportSubtypeIndex)
+    modelSubtypeIndex = property(getModelSubtypeIndex, setModelSubtypeIndex)"""
         
     def getSupportYDirection(self) -> bool:
         return self._support_y_direction
@@ -1359,10 +1344,10 @@ class CustomSupportsReborn(Tool):
         
         self._support_y_direction = new_value
         self._preferences.setValue("customsupportsreborn/support_y_direction", new_value)
-        log("d", f"_support_y_direction being set to {new_value}")
+        log("d", f"CustomSupportsReborn._support_y_direction being set to {new_value}")
         self.propertyChanged.emit()
 
-    supportYDirection = property(getSupportYDirection, setSupportYDirection)
+    #supportYDirection = property(getSupportYDirection, setSupportYDirection)
  
     def getAbutmentEqualizeHeights(self) -> bool:
         return self._abutment_equalize_heights
@@ -1375,10 +1360,10 @@ class CustomSupportsReborn(Tool):
 
         self._abutment_equalize_heights = new_value
         self._preferences.setValue("customsupportsreborn/abutment_equalize_heights", new_value)
-        log("d", f"_abutment_equalize_heights being set to {new_value}")
+        log("d", f"CustomSupportsReborn._abutment_equalize_heights being set to {new_value}")
         self.propertyChanged.emit()
 
-    abutmentEqualizeHeights = property(getAbutmentEqualizeHeights, setAbutmentEqualizeHeights)
+    #abutmentEqualizeHeights = property(getAbutmentEqualizeHeights, setAbutmentEqualizeHeights)
  
     def getModelScaleMain(self) -> bool:
         return self._model_scale_main
@@ -1391,10 +1376,10 @@ class CustomSupportsReborn(Tool):
 
         self._model_scale_main = new_value
         self._preferences.setValue("customsupportsreborn/model_scale_main", new_value)
-        log("d", f"_model_scale_main being set to {new_value}")
+        log("d", f"CustomSupportsReborn._model_scale_main being set to {new_value}")
         self.propertyChanged.emit()
 
-    modelScaleMain = property(getModelScaleMain, setModelScaleMain)
+    #modelScaleMain = property(getModelScaleMain, setModelScaleMain)
         
     def getModelOrient(self) -> bool:
         return self._model_orient
@@ -1407,10 +1392,10 @@ class CustomSupportsReborn(Tool):
 
         self._model_orient = new_value
         self._preferences.setValue("customsupportsreborn/model_orient", new_value)
-        log("d", f"_model_orient being set to {new_value}")
+        log("d", f"CustomSupportsReborn._model_orient being set to {new_value}")
         self.propertyChanged.emit()
     
-    modelOrient = property(getModelOrient, setModelOrient)
+    #modelOrient = property(getModelOrient, setModelOrient)
     
     def getModelMirror(self) -> bool:
         return self._model_mirror
@@ -1423,7 +1408,7 @@ class CustomSupportsReborn(Tool):
 
         self._model_mirror = new_value
         self._preferences.setValue("customsupportsreborn/model_mirror", new_value)
-        log("d", f"_model_mirror being set to {new_value}")
+        log("d", f"CustomSupportsReborn._model_mirror being set to {new_value}")
         self.propertyChanged.emit()
 
-    modelMirror = property(getModelMirror, setModelMirror)
+    #modelMirror = property(getModelMirror, setModelMirror)
