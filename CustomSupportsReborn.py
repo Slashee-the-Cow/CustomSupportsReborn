@@ -64,8 +64,7 @@
 #   Changed icons for abutment and model support types.
 #   Model combo box now remembers what model you had selected.
 
-from PyQt6.QtCore import Qt, QTimer, QObject, QVariant, pyqtProperty
-from PyQt6.QtQml import qmlRegisterType
+from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtWidgets import QApplication
 
 import math
@@ -110,7 +109,7 @@ i18n_catalog = i18nCatalog("customsupportsreborn")
 #if i18n_catalog.hasTranslationLoaded():
 #    Logger.log("i", "Custom Supports Reborn translation loaded")
 
-DEBUG_MODE = True
+DEBUG_MODE = False
 
 def log(level, message):
     """Wrapper function for logging messages using Cura's Logger, but with debug mode so as not to spam you."""
@@ -363,7 +362,7 @@ class CustomSupportsReborn(Tool):
             mesh =  self._createTube(self._support_size, self._support_size_max, self._support_size_inner, 10, self._length, self._top_added_height, use_support_angle, self._taper_direction)
         elif self._support_type == SUPPORT_TYPE_CUBE:
             # Cube creation Size,Maximum Size , length , top Additional Height, Angle of the support
-            mesh =  self._createCube(self._support_size, self._support_size_max, self._length, self._top_added_height, use_support_angle, self._taper_direction)
+            mesh =  self._createCube(self._support_size, self._support_size_max, self._length, self._top_added_height, use_support_angle)
         elif self._support_type == SUPPORT_TYPE_MODEL:
             # Cube creation Size , length
             mesh = MeshBuilder()  
@@ -720,7 +719,7 @@ class CustomSupportsReborn(Tool):
         return mesh_data
         
     # Cube Creation
-    def _createCube(self, base_side, minmax_side, length, top_additional_height, taper_angle, taper_direction):
+    def _createCube(self, base_side, minmax_side, length, top_additional_height, taper_angle):
         mesh = MeshBuilder()
 
         half_base_side = base_side / 2
@@ -728,15 +727,15 @@ class CustomSupportsReborn(Tool):
         total_height = length # Renamed total_height to length for consistency
         top_offset = top_additional_height # Renamed top_offset to top_additional_height for consistency
 
-        if taper_angle > 0 or taper_direction == "outward": # Outward taper (positive angle OR explicit "outward")
+        if taper_angle > 0: # Outward taper (positive angle)
             bottom_width_tapered = half_base_side + math.tan(math.radians(taper_angle)) * (total_height + top_offset)
             bottom_width_tapered = min(bottom_width_tapered, half_minmax_side) # Limit by minmax_side if outward taper
 
-        elif taper_angle < 0 or taper_direction == "inward": # Inward taper (negative angle OR explicit "inward")
+        elif taper_angle < 0: # Inward taper (negative angle)
             bottom_width_tapered = half_base_side - math.tan(math.radians(abs(taper_angle))) * (total_height + top_offset) # Subtract for inward taper
             bottom_width_tapered = max(bottom_width_tapered, half_minmax_side) # Limit by minmax_side if inward taper - MINIMUM size
 
-        else: # No taper (taper_angle == 0 or taper_direction == "none" or default)
+        else: # No taper (taper_angle == 0)
             bottom_width_tapered = half_base_side # Straight cube
 
         if half_minmax_side > half_base_side and taper_angle!=0: # Taper length calculation - outward taper
@@ -1210,6 +1209,7 @@ class CustomSupportsReborn(Tool):
                 taper_length = negative_length
 
         elif taper_angle < 0 or taper_direction == "inward":
+            taper_angle = abs(taper_angle)
             bottom_outer_radius = outer_radius - math.tan(math.radians(taper_angle)) * length
             bottom_outer_radius = max(bottom_outer_radius, minmax_outer_radius)
             bottom_inner_radius = bottom_outer_radius - wall_width # Inner radius also tapers inwards, maintaining wall_width
@@ -1418,18 +1418,43 @@ class CustomSupportsReborn(Tool):
 
         # Calculate vector
         radius = top_diameter / 2
-        max_radius = minmax_diameter / 2
+        minmax_radius = minmax_diameter / 2
         start_height = start_position.y 
-        start_bottom_radius=math.tan(math.radians(taper_angle))*start_height+radius
         end_height = end_position.y 
-        end_bottom_radius=math.tan(math.radians(taper_angle))*end_height+radius
+
+        taper_angle_rad = math.radians(taper_angle) # Convert to radians once
+
+        if taper_angle > 0: # Outward Taper - Existing logic (mostly)
+            start_bottom_radius = math.tan(taper_angle_rad) * start_height + radius
+            end_bottom_radius = math.tan(taper_angle_rad) * end_height + radius
+        elif taper_angle < 0: # Inward Taper - Modified logic to handle negative angle
+            taper_amount_start = abs(math.tan(taper_angle_rad)) * start_height # Absolute taper amount
+            taper_amount_end = abs(math.tan(taper_angle_rad)) * end_height   # Absolute taper amount
+            start_bottom_radius = radius - taper_amount_start  # Subtract taper for inward
+            end_bottom_radius = radius - taper_amount_end    # Subtract taper for inward
+            start_bottom_radius = max(minmax_radius, start_bottom_radius) # Clamp to minmax_radius (bottom_width/2)
+            end_bottom_radius = max(minmax_radius, end_bottom_radius)     # Clamp to minmax_radius (bottom_width/2)
+        else: # Straight taper - unchanged
+            start_bottom_radius = radius
+            end_bottom_radius = radius
  
-        if max_radius > radius and taper_angle != 0:
-            start_taper_length = (max_radius - radius) / math.tan(math.radians(taper_angle))
-            end_taper_length = (max_radius - radius) / math.tan(math.radians(taper_angle))
-        else :
-            start_taper_length=start_height
-            end_taper_length=end_height
+        if taper_angle > 0: # Outward Taper - Existing logic (mostly)
+            if minmax_radius > radius and taper_angle != 0: # Existing condition
+                start_taper_length = (minmax_radius - radius) / math.tan(math.radians(taper_angle))
+                end_taper_length = (minmax_radius - radius) / math.tan(math.radians(taper_angle))
+            else:
+                start_taper_length = start_height
+                end_taper_length = end_height
+        elif taper_angle < 0: # Inward Taper - NEW taper_length calculation
+            if radius > minmax_radius and taper_angle != 0: # New condition for inward taper
+                start_taper_length = (radius - minmax_radius) / abs(math.tan(math.radians(taper_angle))) # Using ABS angle and reversed radius order
+                end_taper_length = (radius - minmax_radius) / abs(math.tan(math.radians(taper_angle)))   # Using ABS angle and reversed radius order
+            else: # Angle too shallow to reach minmax_radius, or straight
+                start_taper_length = start_height # Full height taper
+                end_taper_length = end_height     # Full height taper
+        else: # Straight taper - unchanged
+            start_taper_length = start_height
+            end_taper_length = end_height
  
         top_offset_vector = Vector(0,0,top_offset)
         radius_vector = Vector(0,0,radius)
@@ -1442,8 +1467,8 @@ class CustomSupportsReborn(Tool):
         if start_taper_length < start_height and end_taper_length < end_height and start_taper_length > 0 and end_taper_length > 0: 
             vertices_per_segment=40
             
-            start_max_radius_offset = Vector(normal_vector.x*max_radius,normal_vector.y*max_radius,normal_vector.z*max_radius)
-            end_max_radius_offset = Vector(normal_vector.x*max_radius,normal_vector.y*max_radius,normal_vector.z*max_radius)
+            start_max_radius_offset = Vector(normal_vector.x*minmax_radius,normal_vector.y*minmax_radius,normal_vector.z*minmax_radius)
+            end_max_radius_offset = Vector(normal_vector.x*minmax_radius,normal_vector.y*minmax_radius,normal_vector.z*minmax_radius)
 
             start_max_taper_height_vector = Vector(0,0,-start_taper_length)
             end_max_taper_height_vector = Vector(0,0,-end_taper_length)
