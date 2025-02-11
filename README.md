@@ -11,6 +11,13 @@ Originaly based on the Support Eraser plugin built into Cura and develoed by Ult
 - Conical support is possible by defining an angle
 - Can limit the size of the bottom of the support in case of tapered support
 
+## FAQ
+- **Why do the settings change themselves when I change other settings?**  
+This is to prevent invalid combinations of settings. Testing shows people often don't notice if I just give a subtle hint (like the background of a text box changing colour).
+
+## Known Issues
+- The combo box for selecting a particular model of support may show blank in older versions of Cura. Don't worry, it's still selecting and saving your choice.
+
 **New 2.4.0**
 
 - Possibility to define a max size for the base of the support

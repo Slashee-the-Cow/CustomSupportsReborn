@@ -314,7 +314,7 @@ Item
         Label
         {
             height: UM.Theme.getSize("setting_control").height
-            text: catalog.i18nc("panel:inner-size", "Inner Size")
+            text: catalog.i18nc("panel:wall-width", "wall-width")
             font: UM.Theme.getFont("default")
             color: UM.Theme.getColor("text")
             verticalAlignment: Text.AlignVCenter
@@ -347,11 +347,11 @@ Item
                 target: root
                 function onSupportSizeMaxValueChanged() {
                     //supportSizeTextField.validator.top = root.supportSizeMaxValue;
-                    if(root.supportSizeValue > root.supportSizeMaxValue){
+                    /*if(root.supportSizeValue > root.supportSizeMaxValue){
                         root.supportSizeValue = root.supportSizeMaxValue;
                         supportSizeTextField.displaySupportSize = root.supportSizeValue.toString();
                         setProperty("SupportSize", root.supportSizeValue)
-                    }
+                    }*/
                 }
             }
             Component.onCompleted: {
@@ -385,10 +385,6 @@ Item
                         displaySupportSize = ""
                         displaySupportSize = root.supportSizeValue.toString()
                         return
-                    } else if(text_as_num > root.supportSizeMaxValue) {
-                        root.supportSizeMaxValue = text_as_num;
-                        supportSizeMaxTextField.displaySupportSizeMax = root.supportSizeMaxValue.toString();
-                        setProperty("SupportSizeMax", root.supportSizeMaxValue)
                     } else {
                         root.supportSizeValue = text_as_num;
                         setProperty("SupportSize", text_as_num);
@@ -487,9 +483,9 @@ Item
             Connections{
                 target: root
                 function onSupportSizeValueChanged() {
-                    supportSizeInnerTextField.validator.top = root.supportSizeValue - 0.01
-                    if(root.supportSizeInnerValue >= root.supportSizeValue){
-                        root.supportSizeInnerValue = root.supportSizeValue - 0.01;
+                    supportSizeInnerTextField.validator.top = root.supportSizeValue / 2 - 0.01
+                    if(root.supportSizeInnerValue >= root.supportSizeValue / 2){
+                        root.supportSizeInnerValue = root.supportSizeValue / 2 - 0.01;
                         supportSizeInnerTextField.displaySupportSizeInner = root.supportSizeInnerValue.toString();
                         setProperty("SupportSizeInner", root.supportSizeInnerValue)
                     }
@@ -558,7 +554,7 @@ Item
 
             validator: IntValidator
             {
-                bottom: 0
+                bottom: -89
                 top: 89
             }
 
@@ -601,7 +597,7 @@ Item
             anchors.top: baseCheckBox.top
             // anchors.topMargin: UM.Theme.getSize("default_margin").height
             anchors.left: parent.left
-            text: !modelOrientCheckbox.checked || abutmentButton.checked ? catalog.i18nc("panel:set_on_y", "Set on Y Direction") : catalog.i18nc("panel:set_on_main", "Set on Main Direction")
+            text: !modelOrientCheckbox.checked || abutmentButton.checked ? catalog.i18nc("panel:set_on_opposite", "Set on Opposite Direction") : catalog.i18nc("panel:set_on_main", "Set on Main Direction")
             visible: abutmentButton.checked || modelButton.checked 
 
             //checked: withActiveTool(function(tool) {return tool.supportYDirection})
