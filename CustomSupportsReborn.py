@@ -149,7 +149,7 @@ class CustomSupportsReborn(Tool):
 
         self._catalog = i18nCatalog("customsupportsreborn")
 
-        self.setExposedProperties("SupportType", "ModelSubtype", "SupportSize", "SupportSizeMax", "SupportSizeInner", "SupportAngle", "SupportYDirection", "AbutmentEqualizeHeights", "ModelScaleMain", "ModelOrient", "ModelMirror", "PanelRemoveAllText")
+        self.setExposedProperties("SupportType", "ModelSubtype", "SupportSize", "SupportSizeTapered", "WallWidth", "TaperAngle", "SupportYDirection", "AbutmentEqualizeHeights", "ModelScaleMain", "ModelOrient", "ModelMirror", "PanelRemoveAllText")
 
         self._supports_created: list[SceneNode] = []
         
@@ -158,9 +158,9 @@ class CustomSupportsReborn(Tool):
         
         # variable for menu dialog        
         self._support_size: float = 2.0
-        self._support_size_max: float = 10.0
-        self._support_size_inner: float = 0.0
-        self._support_angle: float = 0.0
+        self._support_size_tapered: float = 10.0
+        self._wall_width: float = 0.0
+        self._taper_angle: float = 0.0
         self._support_y_direction: bool = False
         self._abutment_equalize_heights: bool = True
         self._model_scale_main: bool = True
@@ -180,8 +180,6 @@ class CustomSupportsReborn(Tool):
         self._custom_point_location: Vector = Vector(0,0,0)
         self._selection_pass: SceneNode = None
 
-        self._taper_direction = ""
-        self._effective_taper_angle = 0
         
         
         # Note: if the selection is cleared with this tool active, there is no way to switch to
@@ -200,9 +198,9 @@ class CustomSupportsReborn(Tool):
         # set the preferences to store the default value
         self._preferences = CuraApplication.getInstance().getPreferences()
         self._preferences.addPreference("customsupportsreborn/support_size", 5)
-        self._preferences.addPreference("customsupportsreborn/support_size_max", 10)
-        self._preferences.addPreference("customsupportsreborn/support_size_inner", 2)
-        self._preferences.addPreference("customsupportsreborn/support_angle", 0)
+        self._preferences.addPreference("customsupportsreborn/support_size_tapered", 10)
+        self._preferences.addPreference("customsupportsreborn/wall_width", 2)
+        self._preferences.addPreference("customsupportsreborn/taper_angle", 0)
         self._preferences.addPreference("customsupportsreborn/support_y_direction", False)
         self._preferences.addPreference("customsupportsreborn/abutment_equalize_heights", True)
         self._preferences.addPreference("customsupportsreborn/model_scale_main", True)
@@ -213,9 +211,9 @@ class CustomSupportsReborn(Tool):
         
         # convert as float to avoid further issue
         self._support_size = float(self._preferences.getValue("customsupportsreborn/support_size"))
-        self._support_size_max = float(self._preferences.getValue("customsupportsreborn/support_size_max"))
-        self._support_size_inner = float(self._preferences.getValue("customsupportsreborn/support_size_inner"))
-        self._support_angle = float(self._preferences.getValue("customsupportsreborn/support_angle"))
+        self._support_size_tapered = float(self._preferences.getValue("customsupportsreborn/support_size_tapered"))
+        self._wall_width = float(self._preferences.getValue("customsupportsreborn/wall_width"))
+        self._taper_angle = float(self._preferences.getValue("customsupportsreborn/taper_angle"))
         # convert as boolean to avoid further issue
         self._support_y_direction = bool(self._preferences.getValue("customsupportsreborn/support_y_direction"))
         self._abutment_equalize_heights = bool(self._preferences.getValue("customsupportsreborn/abutment_equalize_heights"))
@@ -226,8 +224,6 @@ class CustomSupportsReborn(Tool):
         self._support_type = str(self._preferences.getValue("customsupportsreborn/support_type"))
         # Sub type for Free Form support
         self._model_subtype = str(self._preferences.getValue("customsupportsreborn/model_subtype"))
-
-        self._setEffectiveTaperAngle()
 
                 
     def event(self, event):
@@ -332,7 +328,7 @@ class CustomSupportsReborn(Tool):
         node.setSelectable(True)
 
         # Prevent big circus tents.
-        use_support_angle = self._effective_taper_angle if self._support_size != self._support_size_max else 0
+        use_taper_angle = self._taper_angle if self._support_size != self._support_size_tapered else 0
         
         # long=Support Height
         self._length=position_start.y
@@ -356,13 +352,13 @@ class CustomSupportsReborn(Tool):
             
         if self._support_type == SUPPORT_TYPE_CYLINDER:
             # Cylinder creation Diameter , Maximum diameter , Increment angle 10°, length , top Additional Height, Angle of the support
-            mesh = self._createCylinder(self._support_size, self._support_size_max, 10, self._length, self._top_added_height, use_support_angle, self._taper_direction)
+            mesh = self._createCylinder(self._support_size, self._support_size_tapered, 10, self._length, self._top_added_height, self._taper_angle)
         elif self._support_type == SUPPORT_TYPE_TUBE:
             # Tube creation Diameter ,Maximum diameter , Diameter Int, Increment angle 10°, length, top Additional Height , Angle of the support
-            mesh =  self._createTube(self._support_size, self._support_size_max, self._support_size_inner, 10, self._length, self._top_added_height, use_support_angle, self._taper_direction)
+            mesh =  self._createTube(self._support_size, self._support_size_tapered, self._wall_width, 10, self._length, self._top_added_height, self._taper_angle)
         elif self._support_type == SUPPORT_TYPE_CUBE:
             # Cube creation Size,Maximum Size , length , top Additional Height, Angle of the support
-            mesh =  self._createCube(self._support_size, self._support_size_max, self._length, self._top_added_height, use_support_angle)
+            mesh =  self._createCube(self._support_size, self._support_size_tapered, self._length, self._top_added_height, self._taper_angle)
         elif self._support_type == SUPPORT_TYPE_MODEL:
             # Cube creation Size , length
             mesh = MeshBuilder()  
@@ -444,7 +440,7 @@ class CustomSupportsReborn(Tool):
             log('d', 'Abutment top : ' + str(self._top))
             # Logger.log('d', 'MaxSize : ' + str(self._MaxSize))
             
-            mesh =  self._createAbutment(self._support_size,self._support_size_max,self._length,self._top,use_support_angle,self._support_y_direction)
+            mesh =  self._createAbutment(self._support_size,self._support_size_tapered,self._length,self._top,self._taper_angle,self._support_y_direction)
         else:           
             # Custom creation Size , P1 as vector P2 as vector
             # Get support_interface_height as extra distance 
@@ -453,7 +449,7 @@ class CustomSupportsReborn(Tool):
                 extra_top = 0
             else :
                 extra_top=extruder_stack.getProperty("support_interface_height", "value")            
-            mesh =  self._createLine(self._support_size,self._support_size_max,position_start,position_end,use_support_angle,extra_top)
+            mesh =  self._createLine(self._support_size,self._support_size_tapered,position_start,position_end,self._taper_angle,extra_top)
 
         # Mesh Model are loaded via trimesh doesn't aheve the Build method
         if self._support_type != 'model':
@@ -930,11 +926,11 @@ class CustomSupportsReborn(Tool):
 
         Args:
         top_width: The width of the top rectangular face.
-        bottom_width: The maximum diameter of the base (for tapered abutments). (Original name 'max_diameter' meaning clarified)
+        bottom_width: The maximum diameter of the base (for tapered abutments).
         total_height: The height of the main body of the abutment.
         top_offset: The additional height added to the top of the abutment.
         taper_angle: The angle of the taper.
-        rotate_90_degrees: Whether to rotate the abutment by 90 degrees in the XY plane ("Horizontal Orientation" in UI). (Renamed from y_mirrored, UI label to be updated)
+        rotate_90_degrees: Whether to rotate the abutment by 90 degrees in the XY plane ("Horizontal Orientation" in UI). (Renamed from y_mirrored)
         """
         # Logger.log('d', 'Ydir : ' + str(ydir))
         mesh = MeshBuilder()
@@ -1024,7 +1020,7 @@ class CustomSupportsReborn(Tool):
         return mesh
         
     # Cylinder creation
-    def _createCylinder(self, diameter, minmax_diameter, circle_segments, length, top_additional_height, taper_angle, taper_direction):
+    def _createCylinder(self, diameter, minmax_diameter, circle_segments, length, top_additional_height, taper_angle):
         mesh = MeshBuilder()
         # Per-vertex normals require duplication of vertices
         radius = diameter / 2
@@ -1034,7 +1030,7 @@ class CustomSupportsReborn(Tool):
         num_segments = int(360 / circle_segments)
         angle_increment_radians = math.radians(circle_segments)
         
-        if taper_angle > 0 or taper_direction == "outward":
+        if taper_angle > 0:  # Tapering outwards
             bottom_radius = math.tan(math.radians(taper_angle)) * length + radius
             bottom_radius = min(bottom_radius, minmax_radius)
             if minmax_radius > radius and taper_angle != 0: # minmax_radius is max_radius in this case
@@ -1043,7 +1039,7 @@ class CustomSupportsReborn(Tool):
             else :
                 taper_length = negative_length
 
-        elif taper_angle < 0 or taper_direction == "inward":
+        elif taper_angle < 0:  # Tapering inwards
             taper_angle = abs(taper_angle)
             bottom_radius = radius - math.tan(math.radians(taper_angle)) * length
             bottom_radius = max(bottom_radius, minmax_radius) # minmax_radius is min_radius in this case, ensure bottom_radius doesn't go below min_radius
@@ -1056,11 +1052,9 @@ class CustomSupportsReborn(Tool):
             bottom_radius = radius
             taper_length = negative_length
             
-        #Logger.log('d', 'lg : ' + str(lg))
-        #Logger.log('d', 'l_max : ' + str(l_max)) 
 
         log('d', f'taper_length: {taper_length}')
-        log('d', f'length: {length}') # ADDED: Log length value
+        log('d', f'length: {length}')
         log('d', f'Condition (taper_length < length and taper_length > 0): {taper_length < length and taper_length > 0}')
 
         
@@ -1186,7 +1180,7 @@ class CustomSupportsReborn(Tool):
         return mesh
  
    # Tube creation
-    def _createTube(self, outer_diameter, minmax_diameter, wall_width, circle_segments, length, top_additional_height, taper_angle, taper_direction):
+    def _createTube(self, outer_diameter, minmax_diameter, wall_width, circle_segments, length, top_additional_height, taper_angle):
         # Logger.log('d', 'isize : ' + str(isize)) 
         mesh = MeshBuilder()
         outer_radius = outer_diameter / 2
@@ -1198,7 +1192,7 @@ class CustomSupportsReborn(Tool):
         num_segments = int(360 / circle_segments)
         angle_increment_radians = math.radians(circle_segments)
 
-        if taper_angle > 0 or taper_direction == "outward":
+        if taper_angle > 0:  # Tapering outwards
             bottom_outer_radius = math.tan(math.radians(taper_angle)) * length + outer_radius
             bottom_outer_radius = min(bottom_outer_radius, minmax_outer_radius)
             bottom_inner_radius = bottom_outer_radius - wall_width # Inner radius also tapers outwards, maintaining wall_width
@@ -1208,7 +1202,7 @@ class CustomSupportsReborn(Tool):
             else:
                 taper_length = negative_length
 
-        elif taper_angle < 0 or taper_direction == "inward":
+        elif taper_angle < 0:  # Tapering inwards
             taper_angle = abs(taper_angle)
             bottom_outer_radius = outer_radius - math.tan(math.radians(taper_angle)) * length
             bottom_outer_radius = max(bottom_outer_radius, minmax_outer_radius)
@@ -1218,9 +1212,9 @@ class CustomSupportsReborn(Tool):
                 taper_length = min(taper_length, length)
             else:
                 taper_length = negative_length
-        else: # No taper
+        else:  # No taper
             bottom_outer_radius = outer_radius
-            bottom_inner_radius = inner_radius # No taper for inner cylinder either
+            bottom_inner_radius = inner_radius
             taper_length = negative_length
             
         vertices = []
@@ -1599,30 +1593,30 @@ class CustomSupportsReborn(Tool):
     
     #supportSize = property(getSupportSize, setSupportSize)
 
-    def getSupportSizeMax(self) -> float:
-        return self._support_size_max
+    def getSupportSizeTapered(self) -> float:
+        return self._support_size_tapered
   
-    def setSupportSizeMax(self, new_size: str) -> None:
+    def setSupportSizeTapered(self, new_size: str) -> None:
         try:
             new_value = float(new_size)
         except ValueError:
             return
 
         if new_value < 0:
-            log("i", "Tried to set SupportSizeMax to < 0")
+            log("i", "Tried to set SupportSizeTapered to < 0")
             return
         
-        self._support_size_max = new_value
-        self._preferences.setValue("customsupportsreborn/support_size_max", new_value)
-        log("d", f"CustomSupportsReborn._support_size_max being set to {new_value}")
+        self._support_size_tapered = new_value
+        self._preferences.setValue("customsupportsreborn/support_size_tapered", new_value)
+        log("d", f"CustomSupportsReborn._support_size_tapered being set to {new_value}")
         self.propertyChanged.emit()
     
-    #supportSizeMax = property(getSupportSizeMax, setSupportSizeMax)
+    #supportSizeTapered = property(getSupportSizeTapered, setSupportSizeTapered)
         
-    def getSupportSizeInner(self) -> float:
-        return self._support_size_inner
+    def getWallWidth(self) -> float:
+        return self._wall_width
   
-    def setSupportSizeInner(self, new_size: str) -> None:
+    def setWallWidth(self, new_size: str) -> None:
         try:
             new_value = float(new_size)
         except ValueError:
@@ -1634,41 +1628,29 @@ class CustomSupportsReborn(Tool):
             new_value = self._support_size
         
         #Logger.log('d', 's_value : ' + str(s_value))        
-        self._support_size_inner = new_value
-        self._preferences.setValue("customsupportsreborn/support_size_inner", new_value)
-        log("d", f"CustomSupportsReborn._support_size_inner being set to {new_value}")
+        self._wall_width = new_value
+        self._preferences.setValue("customsupportsreborn/wall_width", new_value)
+        log("d", f"CustomSupportsReborn._wall_width being set to {new_value}")
         self.propertyChanged.emit()
     
-    #supportSizeInner = property(getSupportSizeInner, setSupportSizeInner)
+    #wallWidth = property(getWallWidth, setWallWidth)
         
-    def getSupportAngle(self) -> float:
-        return self._support_angle
+    def getTaperAngle(self) -> float:
+        return self._taper_angle
   
-    def setSupportAngle(self, new_angle: str) -> None:
+    def setTaperAngle(self, new_angle: str) -> None:
         try:
             new_value = float(new_angle)
         except ValueError:
             return
 
         # Logger.log('d', 's_value : ' + str(s_value))        
-        self._support_angle = new_value
-        self._preferences.setValue("customsupportsreborn/support_angle", new_value)
-        log("d", f"CustomSupportsReborn._support_angle being set to {new_value}")
+        self._taper_angle = new_value
+        self._preferences.setValue("customsupportsreborn/taper_angle", new_value)
+        log("d", f"CustomSupportsReborn._taper_angle being set to {new_value}")
         self.propertyChanged.emit()
-        self._setEffectiveTaperAngle()
 
-    def _setEffectiveTaperAngle(self) -> None:
-        if self._support_angle == 0:
-            self._effective_taper_angle = 0
-            self._taper_direction = ""
-        elif self._support_angle > 0:
-            self._effective_taper_angle = self._support_angle
-            self._taper_direction = "outward"
-        else:
-            self._effective_taper_angle = self._support_angle
-            self._taper_direction = "inward"
-
-    #supportAngle = property(getSupportAngle, setSupportAngle)
+    #taperAngle = property(getTaperAngle, setTaperAngle)
  
     def getPanelRemoveAllText(self) -> str:
         return self._panel_remove_all_text

@@ -3,15 +3,15 @@
 // Reborn version copyright 2025 Slashee the Cow
 // 
 // proterties values
-//   "supportSize"               : Support Size in mm
-//   "supportSizeMax"            : Support Maximum Size in mm
-//   "supportSizeInner"          : Support Interior Size in mm
-//   "supportAngle"              : Support Angle in °
+//   "supportSize"               : Support size in mm
+//   "supportSizeTapered"        : Tapered support size in mm
+//   "wallWidth"                 : Tube wall width in mm
+//   "taperAngle"                : Taoer angle in °
 //   "supportYDirection"         : Support Y direction (Abutment)
 //   "abutmentEqualizeHeights"   : Equalize heights (Abutment)
 //   "modelScaleMain"            : Scale Main direction (Model)
 //   "supportType"               : Support Type ( Cylinder/Tube/Cube/Abutment/Line/Model ) 
-//   "modelSubtype"            : Support model Type ( Cross/Section/Pillar/Bridge/Custom ) 
+//   "modelSubtype"              : Support model Type ( Cross/Section/Pillar/Bridge/Custom ) 
 //   "modelOrient"               : Support Automatic Orientation for model Type
 //   "modelMirror"               : Support Mirror for model Type
 //   "panelRemoveAllText"        : Text for the Remove All Button
@@ -19,9 +19,12 @@
 
 import QtQuick 6.0
 import QtQuick.Controls 6.0
+import QtQuick.Layouts 6.0
 
 import UM 1.6 as UM
 import Cura 1.1 as Cura
+
+import ".."
 
 Item
 {
@@ -34,15 +37,34 @@ Item
     readonly property string supportTypeLine: "line"
     readonly property string supportTypeModel: "model"
 
+    readonly property string iconWarning: "icon_warning.svg"
+    readonly property string iconInfo: "icon_info.svg"
+    readonly property string iconBlank: ""
+
     UM.I18nCatalog {id: catalog; name: "customsupportsreborn"}
 
     width: childrenRect.width
     height: childrenRect.height
 
     property real supportSizeValue: 0
-    property real supportSizeMaxValue: 0
-    property real supportSizeInnerValue: 0
-    property real supportAngleValue: 0
+    property real supportSizeTaperedValue: 0
+    property real wallWidthValue: 0
+    property real taperAngleValue: 0
+
+    property string supportSizeIconToolTipText: ""
+    property string supportSizeIconImage: ""
+
+    property string supportSizeTaperedIconToolTipText: ""
+    property string supportSizeTaperedIconImage: ""
+
+    property string wallWidthIconToolTipText: ""
+    property string wallWidthIconImage: ""
+
+    property string taperAngleIconToolTipText: ""
+    property string taperAngleIconImage: ""
+
+    property string modelSubtypeIconToolTipText: ""
+    property string modelSubtypeIconImage: ""
 
     function getCuraVersion(){
         if(CuraApplication.version){
@@ -113,12 +135,10 @@ Item
         lineButton.checked = getProperty("SupportType") === supportTypeLine
         modelButton.checked = getProperty("SupportType") === supportTypeModel
 
-        supportSizeMaxValue = getProperty("SupportSizeMax")
         supportSizeValue = getProperty("SupportSize")
-        //supportSizeTextField.validator.top = supportSizeMaxValue
-        supportSizeInnerValue = getProperty("SupportSizeInner")
-        supportSizeInnerTextField.validator.top = supportSizeValue - 0.01
-        supportAngleValue = getProperty("SupportAngle")
+        supportSizeTaperedValue = getProperty("SupportSizeTapered")
+        wallWidthValue = getProperty("WallWidth")
+        taperAngleValue = getProperty("TaperAngle")
 
         supportYDirectionCheckbox.checked = getProperty("SupportYDirection")
         modelMirrorCheckbox.checked = getProperty("ModelMirror")
@@ -130,6 +150,9 @@ Item
     
     Component.onCompleted: {    
         updateUI();
+        //supportSizeIconImage = "icon_warning.svg"
+        //supportSizeIconTooltipText = "WARNING: This is a test."
+        //supportSizeIcon.visible = false
     }
     
     //property var support_size: getProperty("SupportSize")
@@ -263,16 +286,411 @@ Item
             }
         }
     }
-    
-    Grid
+
+    //property int labelWidth: 60
+    property int labelWidth = Math.max(supportSizeLabel.contentWidth, wallWidthLabel.contentWidth, taperAngleLabel.contentWidth, modelSubtypeLabel.contentWidth, supportSizeTaperedLabel.contentWidth)
+    property int textFieldWidth: 110
+    property int textFieldHeight: UM.Theme.getSize("setting_control").height
+    property int iconWidth: UM.Theme.getSize("setting_control").height
+    property int iconHeight: UM.Theme.getSize("setting_control").height
+    ColumnLayout {
+        id: inputTextFields
+        anchors.top: supportTypeButtons.bottom
+        spacing: UM.Theme.getSize("default_margin").height / 2
+        RowLayout {
+            id: supportSizeRow
+            spacing: UM.Theme.getSize("default_margin").width
+            
+            UM.Label {
+                id: supportSizeLabel
+                text: catalog.i18nc("panel:size", "Size")
+                Layout.preferredWidth: labelWidth
+            }
+
+            UM.TextFieldWithUnit {
+                id: supportSizeTextField
+                property string displaySupportSize: "0"
+                Layout.preferredWidth: textFieldWidth
+                height: textFieldHeight
+                unit: "mm"
+                text: displaySupportSize
+                Connections{
+                    target: root
+                    function onSupportSizeTaperedValueChanged() {
+                        //supportSizeTextField.validator.top = root.supportSizeTaperedValue;
+                        /*if(root.supportSizeValue > root.supportSizeTaperedValue){
+                            root.supportSizeValue = root.supportSizeTaperedValue;
+                            supportSizeTextField.displaySupportSize = root.supportSizeValue.toString();
+                            setProperty("SupportSize", root.supportSizeValue)
+                        }*/
+                    }
+                }
+                Component.onCompleted: {
+                    displaySupportSize = root.supportSizeValue.toString()
+                }
+
+                validator: DoubleValidator
+                {
+                    decimals: 2
+                    bottom: 0.1
+                    locale: "en_US"
+                    notation: DoubleValidator.StandardNotation
+                }
+
+                onFocusChanged:
+                {
+                    if(focus){
+                        return;
+                    }
+                    var modified_text = supportSizeTextField.text.replace(",", ".") // User convenience. We use dots for decimal values
+                    if(modified_text === ""){
+                        displaySupportSize = ""
+                        displaySupportSize = root.supportSizeValue.toString();
+                    } else {
+                        var text_as_num = parseFloat(modified_text)
+                        if (isNaN(text_as_num)){
+                            displaySupportSize = ""
+                            displaySupportSize = root.supportSizeValue.toString()
+                            return
+                        } else if(text_as_num == 0){
+                            displaySupportSize = ""
+                            displaySupportSize = root.supportSizeValue.toString()
+                            return
+                        } else {
+                            root.supportSizeValue = text_as_num;
+                            setProperty("SupportSize", text_as_num);
+                            displaySupportSize = text_as_num.toString();
+                        }
+                    }
+                }
+            }
+
+            IconToolTip {
+                id: supportSizeIconToolTip
+                imageSource: supportSizeIconImage
+                toolTipText: supportSizeIconToolTipText
+                Layout.preferredWidth: iconWidth
+                Layout.preferredHeight: iconHeight
+            }
+        }
+        RowLayout {
+            spacing: UM.Theme.getSize("default_margin").width
+            id: wallWidthRow
+            visible: tubeButton.checked
+
+            UM.Label {
+                id: wallWidthLabel
+                text: catalog.i18nc("panel:wall-width", "Wall Width")
+                Layout.preferredWidth: labelWidth
+            }
+
+            UM.TextFieldWithUnit {
+                id: wallWidthTextField
+                property string displayWallWidth: "0"
+                Layout.preferredWidth: textFieldWidth
+                height: textFieldHeight
+                unit: "mm"
+                text: displayWallWidth
+                
+                Connections{
+                    target: root
+                    function onSupportSizeValueChanged() {
+                        wallWidthTextField.validator.top = root.supportSizeValue / 2 - 0.01
+                        if(root.wallWidthValue >= root.supportSizeValue / 2){
+                            root.wallWidthValue = root.supportSizeValue / 2 - 0.01;
+                            wallWidthTextField.displayWallWidth = root.wallWidthValue.toString();
+                            setProperty("WallWidth", root.wallWidthValue)
+                        }
+                    }
+                }
+
+                Component.onCompleted: {
+                    displayWallWidth = root.wallWidthValue.toString()
+                }
+                validator: DoubleValidator
+                {
+                    decimals: 2
+                    top: 10
+                    bottom: 0.1
+                    locale: "en_US"
+                    notation: DoubleValidator.StandardNotation
+                }
+
+                onFocusChanged:
+                {
+                    if(focus){
+                        return;
+                    }
+                    var modified_text = wallWidthTextField.text.replace(",", ".") // User convenience. We use dots for decimal values
+                    if(modified_text === ""){
+                        displayWallWidth = ""
+                        displayWallWidth = root.wallWidthValue.toString()
+                        return
+                    } else {
+                        var text_as_num = parseFloat(modified_text)
+                        if(isNaN(text_as_num)){
+                            displayWallWidth = ""
+                            displayWallWidth = root.wallWidthValue.toString()
+                            return
+                        } else {
+                            if(text_as_num == 0){
+                                displayWallWidth = ""
+                                displayWallWidth = root.wallWidthValue.toString()
+                                return
+                            } else if(text_as_num > root.supportSizeValue - 0.01){
+                                displayWallWidth = ""
+                                text_as_num = root.supportSizeValue - 0.01
+                            }
+                            root.wallWidthValue = text_as_num
+                            setProperty("WallWidth", text_as_num)
+                            displayWallWidth = text_as_num.toString()
+                        }
+                    }
+                }
+            }
+
+            IconToolTip {
+                id: wallWidthIconToolTip
+                imageSource: wallWidthIconImage
+                toolTipText: wallWidthIconToolTipText
+                Layout.preferredWidth: iconWidth
+                Layout.preferredHeight: iconHeight
+            }
+        }
+
+        RowLayout {
+            spacing: UM.Theme.getSize("default_margin").width
+            id: taperAngleRow
+            visible: !modelButton.checked
+            
+            UM.Label {
+                id: taperAngleLabel
+                text: catalog.i18nc("panel:angle", "Taper Angle")
+                Layout.preferredWidth: labelWidth
+            }
+
+            UM.TextFieldWithUnit {
+                id: taperAngleTextField
+                property string displayTaperAngle: "0"
+
+                Layout.preferredWidth: textFieldWidth
+                height: textFieldHeight
+                unit: "°"
+                text: displayTaperAngle
+
+                Component.onCompleted:{
+                    displayTaperAngle = root.taperAngleValue.toString()
+                }
+
+                validator: IntValidator
+                {
+                    bottom: -89
+                    top: 89
+                }
+
+                onFocusChanged:
+                {
+                    if(focus){
+                        return;
+                    }
+                    var modified_text = taperAngleTextField.text.replace(",", ".") // User convenience. We use dots for decimal values
+                    if (modified_text === ""){
+                        displayTaperAngle = ""
+                        displayTaperAngle = root.taperAngleValue.toString()
+                    } else {
+                        var text_as_num = parseFloat(modified_text)
+                        if(isNaN(text_as_num)){
+                            displayTaperAngle = ""
+                            displayTaperAngle = root.taperAngleValue.toString()
+                        } else {
+                            root.taperAngleValue = text_as_num
+                            setProperty("TaperAngle", text_as_num)
+                            displayTaperAngle = text_as_num.toString()
+                       }
+                   }
+                }
+            }
+            IconToolTip {
+                id: taperAngleIconToolTip
+                imageSource: taperAngleIconImage
+                toolTipText: taperAngleIconToolTipText
+                Layout.preferredWidth: iconWidth
+                Layout.preferredHeight: iconHeight
+            }
+        }
+
+        RowLayout {
+            id modelSubtypeRow
+            spacing: UM.Theme.getSize("default_margin").width
+            visible: modelButton.checked
+            UM.Label {
+                id: modelSubtypeLabel
+                text: catalog.i18nc("panel:model", "Model")
+                Layout.preferredWidth: labelWidth
+            }
+            ComboBox {
+            id: modelSubtype
+            model: ListModel {
+               id: subtypeItems
+               ListElement { text: "cross"}
+               ListElement { text: "section"}
+               ListElement { text: "pillar"}
+               ListElement { text: "bridge"}
+               ListElement { text: "arch-buttress"}
+               ListElement { text: "t-support"}
+               ListElement { text: "custom"}
+                }
+                Layout.preferredWidth: localwidth
+                height: UM.Theme.getSize("setting_control").height
+                Component.onCompleted: {
+                }
+                
+                onActivated: {
+                    setProperty("ModelSubtype", subtypeItems.get(currentIndex).text);
+                }
+            }
+        }
+
+        IconToolTip {
+            id: modelSubtypeIconToolTip
+            imageSource: modelSubtypeIconImage
+            toolTipText: modelSubtypeIconToolTipText
+            Layout.preferredWidth: iconWidth
+            Layout.preferredHeight: iconHeight
+        }
+
+        RowLayout {
+            id: supportSizeTaperedSizeRow
+            spacing: UM.Theme.getSize("default_margin").width
+            visible: taperAngleValue != 0
+            UM.Label {
+                id: supportSizeTaperedSizeLabel
+                text: catalog.i18nc("panel:tapered_size", "Tapered Size ")
+                Layout.preferredWidth: labelWidth
+            }
+            UM.TextFieldWithUnit {
+                id: supportSizeTaperedTextField
+                property string displaySupportSizeTapered: "0"
+                Layout.preferredWidth: textFieldWidth
+                height: textFieldHeight
+                unit: "mm"
+                text: displaySupportSizeTapered
+
+                Component.onCompleted: {
+                    displaySupportSizeTapered = root.supportSizeTaperedValue.toString()
+                }
+
+                validator: DoubleValidator {
+                    decimals: 2
+                    bottom: 0.01
+                    locale: "en_US"
+                    notation: DoubleValidator.StandardNotation
+                }
+
+                onFocusChanged: {
+                    if(focus){
+                        return;
+                    }
+                    console.log("supportSizeTaperedTextField onEditingFinish")
+                    var modified_text = supportSizeTaperedTextField.text.replace(",", ".") // User convenience. We use dots for decimal values
+                    if (modified_text === ""){
+                        displaySupportSizeTapered = ""
+                        displaySupportSizeTapered = root.supportSizeTaperedValue.toString();
+                        return
+                    } else {
+                        var text_as_num = parseFloat(modified_text)
+                        if (isNaN(text_as_num)){
+                            displaySupportSizeTapered = ""
+                            displaySupportSizeTapered = root.supportSizeTaperedValue.toString();
+                            return
+                        } else if(text_as_num == 0) {
+                            displaySupportSizeTapered = ""
+                            displaySupportSizeTapered = root.supportSizeTaperedValue.toString()
+                            return
+                        } {
+                            root.supportSizeTaperedValue = text_as_num
+                            setProperty("SupportSizeTapered", text_as_num)
+                            displaySupportSizeTapered = text_as_num.toString()
+                        }
+                    }
+                }
+            }
+            IconToolTip{
+                id: supportSizeTaperedIconToolTip
+                imageSource: supportSizeTaperedIconImage
+                toolTipText: supportSizeTaperedIconToolTipText
+                Layout.preferredWidth: iconWidth
+                Layout.preferredHeight: iconHeight
+            }
+        }
+    }
+
+    function validateInputs(){
+        let support_size = root.supportSizeValue
+        let taper_angle = root.taperAngleValue
+        let support_size_tapered = root.supportSizeTaperedValue
+
+        let returnValid = true
+
+        let minimum_distance = 0.01
+
+        if (taper_angle < 0){
+            SupportSizeTaperedTextField.validator.top = supportSizeValue - minimum_distance
+            SupportSizeTaperedTextField.validator.bottom = Infinity
+            if (!supportSizeTaperedTextField.acceptableInput){
+                supportSizeTaperedIconImage = iconWarning
+                supportSizeTaperedIconToolTipText = catalog.i18nc("panel_warning_over_min", "Tapered size must be under support size with negative taper.")
+            } else {
+                supportSizeTaperedIconImage = iconBlank
+                supportSizeTaperedIconToolTipText = ""
+            }
+        } elif (taper_angle > 0){
+            supportSizeTaperedTextField.validator.top = Infinity
+            SupportSizeTaperedTextField.validator.bottom = supportSizeValue + minimum_distance
+            if (!supportSizeTaperedTextField.acceptableInput){
+                supportSizeTaperedIconImage = iconWarning
+                supportSizeTaperedIconToolTipText = catalog.i18nc("panel_warning_over_min", "Tapered size must be higher than support size with positive taper.")
+            } else {
+                supportSizeTaperedIconImage = iconBlank
+                supportSizeTaperedIconToolTipText = ""
+            }
+        } else {
+            supportSizeTaperedIconImage = iconBlank
+            supportSizeTaperedIconToolTipText = ""
+        }
+    }
+
+    /*function showErrorToolTip(textField, icon, message) {
+        // Find the corresponding IconToolTip (you'll need to adjust this based on how you associate tooltips with fields)
+        let toolTip = findToolTipForField(textField); // Implement this function
+        if (toolTip) {
+            toolTip.text = message;
+            toolTip.visible = true;
+        }
+    }
+
+    function hideErrorToolTip(textField) {
+        let toolTip = findToolTipForField(textField);
+        if (toolTip) {
+            toolTip.visible = false;
+            toolTip.text = "";
+        }
+    }
+
+    function findToolTipForField(textField) {
+        //Find the IconToolTip associated with the given TextField
+        return textField.parent.children.find(child => child instanceof IconToolTip);
+    }*/
+
+    /*Grid
     {
         id: textfields
         anchors.leftMargin: UM.Theme.getSize("default_margin").width
-        anchors.top: supportTypeButtons.bottom
+        anchors.top: inputTextFields.bottom
         anchors.topMargin: UM.Theme.getSize("default_margin").height
 
         columns: 2
-        flow: Grid.TopToBottom
+        flow: Grid.LeftToRight
         spacing: Math.round(UM.Theme.getSize("default_margin").width / 2)
 
         Label
@@ -286,58 +704,9 @@ Item
             width: Math.ceil(contentWidth) //Make sure that the grid cells have an integer width.
         }
  
-        Label
-        {
-            height: UM.Theme.getSize("setting_control").height
-            text: catalog.i18nc("panel:max_size", "Max Size")
-            font: UM.Theme.getFont("default")
-            color: UM.Theme.getColor("text")
-            verticalAlignment: Text.AlignVCenter
-            visible: !modelButton.checked
-            renderType: Text.NativeRendering
-            width: Math.ceil(contentWidth) //Make sure that the grid cells have an integer width.
-        }
-
-        Label
-        {
-            height: UM.Theme.getSize("setting_control").height
-            text: catalog.i18nc("panel:model", "Model")
-            font: UM.Theme.getFont("default")
-            color: UM.Theme.getColor("text")
-            verticalAlignment: Text.AlignVCenter
-            visible: modelButton.checked
-            renderType: Text.NativeRendering
-            width: Math.ceil(contentWidth) //Make sure that the grid cells have an integer width.
-        }
-
-    
-        Label
-        {
-            height: UM.Theme.getSize("setting_control").height
-            text: catalog.i18nc("panel:wall-width", "wall-width")
-            font: UM.Theme.getFont("default")
-            color: UM.Theme.getColor("text")
-            verticalAlignment: Text.AlignVCenter
-            renderType: Text.NativeRendering
-            visible: tubeButton.checked
-            width: Math.ceil(contentWidth) //Make sure that the grid cells have an integer width.
-        }
-        
-        Label
-        {
-            height: UM.Theme.getSize("setting_control").height
-            text: catalog.i18nc("panel:angle", "Angle")
-            font: UM.Theme.getFont("default")
-            color: UM.Theme.getColor("text")
-            verticalAlignment: Text.AlignVCenter
-            visible: !modelButton.checked
-            renderType: Text.NativeRendering
-            width: Math.ceil(contentWidth) //Make sure that the grid cells have an integer width.
-        }
-        
         UM.TextFieldWithUnit
         {
-            id: supportSizeTextField
+            id: supportSizeTextFieldGrid
             property string displaySupportSize: "0"
             width: localwidth
             height: UM.Theme.getSize("setting_control").height
@@ -393,10 +762,28 @@ Item
                 }
             }
         }
+        Item {
+            IconToolTip {
+                id: supportSizeIconToolTipGrid
+                imageSource: supportSizeIconImage
+                toolTipText: supportSizeIconToolTipText
+            }
+        }
+        
+        Label {
+            height: UM.Theme.getSize("setting_control").height
+            text: catalog.i18nc("panel:max_size", "Min/Max Size")
+            font: UM.Theme.getFont("default")
+            color: UM.Theme.getColor("text")
+            verticalAlignment: Text.AlignVCenter
+            visible: !modelButton.checked
+            renderType: Text.NativeRendering
+            width: Math.ceil(contentWidth) //Make sure that the grid cells have an integer width.
+        }
 
         UM.TextFieldWithUnit
         {
-            id: supportSizeMaxTextField
+            id: supportSizeMaxTextFieldGrid
             property string displaySupportSizeMax: "0"
             width: localwidth
             height: UM.Theme.getSize("setting_control").height
@@ -444,9 +831,24 @@ Item
                     }
             }
         }
+        
+        Item{
 
+        }
+
+        Label
+        {
+            height: UM.Theme.getSize("setting_control").height
+            text: catalog.i18nc("panel:model", "Model")
+            font: UM.Theme.getFont("default")
+            color: UM.Theme.getColor("text")
+            verticalAlignment: Text.AlignVCenter
+            visible: modelButton.checked
+            renderType: Text.NativeRendering
+            width: Math.ceil(contentWidth) //Make sure that the grid cells have an integer width.
+        }
         ComboBox {
-            id: modelSubtype
+            id: modelSubtypeGrid
             model: ListModel {
                id: subtypeItems
                ListElement { text: "cross"}
@@ -467,12 +869,25 @@ Item
                 setProperty("ModelSubtype", subtypeItems.get(currentIndex).text);
             }
         }
-
         
-                
+        Item{
+
+        }
+    
+        Label
+        {
+            height: UM.Theme.getSize("setting_control").height
+            text: catalog.i18nc("panel:wall-width", "Wall Width")
+            font: UM.Theme.getFont("default")
+            color: UM.Theme.getColor("text")
+            verticalAlignment: Text.AlignVCenter
+            renderType: Text.NativeRendering
+            visible: tubeButton.checked
+            width: Math.ceil(contentWidth) //Make sure that the grid cells have an integer width.
+        }
         UM.TextFieldWithUnit
         {
-            id: supportSizeInnerTextField
+            id: supportSizeInnerTextFieldGrid
             property string displaySupportSizeInner: "0"
             width: localwidth
             height: UM.Theme.getSize("setting_control").height
@@ -537,9 +952,24 @@ Item
             }
         }
         
-        UM.TextFieldWithUnit
-        {
-            id: supportAngleTextField
+        Item{
+
+        }
+        
+        Label {
+            height: UM.Theme.getSize("setting_control").height
+            text: catalog.i18nc("panel:angle", "Taper Angle")
+            font: UM.Theme.getFont("default")
+            color: UM.Theme.getColor("text")
+            verticalAlignment: Text.AlignVCenter
+            visible: !modelButton.checked
+            renderType: Text.NativeRendering
+            width: Math.ceil(contentWidth) //Make sure that the grid cells have an integer width.
+        }
+
+        
+        UM.TextFieldWithUnit {
+            id: supportAngleTextFieldGrid
             property string displaySupportAngle: "0"
 
             width: localwidth
@@ -549,7 +979,7 @@ Item
             text: displaySupportAngle
 
             Component.onCompleted:{
-                displaySupportAngle = root.supportAngleValue.toString()
+                displaySupportAngle = root.taperAngleValue.toString()
             }
 
             validator: IntValidator
@@ -566,20 +996,24 @@ Item
                 var modified_text = supportAngleTextField.text.replace(",", ".") // User convenience. We use dots for decimal values
                 if (modified_text === ""){
                     displaySupportAngle = ""
-                    displaySupportAngle = root.supportAngleValue.toString()
+                    displaySupportAngle = root.taperAngleValue.toString()
                 } else {
                     var text_as_num = parseFloat(modified_text)
                     if(isNaN(text_as_num)){
                         displaySupportAngle = ""
-                        displaySupportAngle = root.supportAngleValue.toString()
+                        displaySupportAngle = root.taperAngleValue.toString()
                     } else {
-                        root.supportAngleValue = text_as_num
+                        root.taperAngleValue = text_as_num
                         setProperty("SupportAngle", text_as_num)
                         displaySupportAngle = text_as_num.toString()
                     }
                 }
             }
         }
+
+        Item {
+
+        }*/
     }
     
     Item
