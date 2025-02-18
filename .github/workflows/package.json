@@ -5,11 +5,11 @@
         "email": "slasheethecow@gmail.com",
         "website": "http://github.com/Slashee-the-Cow/"
     },
-    "description": "Originally by 5@xes - This plugin adds several custom supports you can use for your model instead of the support automatically added by Cura.\n\nGiven new life by Slashee the Cow so everyone can use this awesome tool.",
+    "description": "This plugin adds several shapes of custom support you can use for your model instead of the support automatically added by Cura.\n\nThis plugin was originally made by 5@xes.",
     "display_name": "Custom Supports Reborn",
     "package_id": "CustomSupportsReborn",
     "package_type": "plugin",
-    "package_version": "1.0.2",
+    "package_version": "1.2.0",
     "sdk_version": 8,
     "sdk_version_semver": "8.0.0",
     "website": "https://github.com/Slashee-the-Cow/CustomSupportsReborn/"

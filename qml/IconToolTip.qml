@@ -6,28 +6,25 @@ import UM 1.6 as UM
 
 Item {
     id: container
-    property alias imageSource: iconImage.source
+    property string imageSource: ""
+    property string iconThemeColor: "icon"
     property string toolTipText: ""
-    property alias iconColor: iconImage.color
-    
-
-    height: UM.Theme.getSize("setting_control").height
-    width: UM.Theme.getSize("setting_control").height
-    
-    
+    property bool toolTipVisible: true
     
     Pane {
         id: toolTipPane
+        anchors.fill: parent
         hoverEnabled: true
-        background: Rectangle {color: "green"}
-
-        property bool toolTipVisible: true
+        background: Rectangle {color: "transparent"}
+        padding: 0
+        
 
         UM.ColorImage {
+            visible: true
             id: iconImage
-            anchors.centerIn: parent
-            source: ""
-            color: UM.Theme.getColor("icon")
+            anchors.fill: parent
+            source: Qt.resolvedUrl(imageSource)
+            color: UM.Theme.getColor(iconThemeColor)
         }
 
         visible: toolTipText !== ""

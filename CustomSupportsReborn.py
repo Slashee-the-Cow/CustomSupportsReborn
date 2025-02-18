@@ -8,42 +8,6 @@
 ##--------------------------------------------------------------------------------------------
 # All modifications 15 April-2020 to 13 March 2023 Copyright(c) 5@xes 
 #--------------------------------------------------------------------------------------------
-# First release 05-18-2020  to change the initial plugin into cylindric support
-# Modif 0.01 : Cylinder length -> Pick Point to base plate height
-# Modif 0.02 : Using  support_tower_diameter as variable to define the cylinder
-# Modif 0.03 : Using a special parameter  diameter_custom_support as variable to define the cylinder
-# Modif 0.04 : Add a text field to define the diameter
-# Modif 0.05 : Add checkbox and option to switch between Cube / Cylinder
-# Modif 0.06 : Symplify code and store defaut size support in Preference "customsupportcylinder/s_size" default value 5
-# V0.9.0 05-20-2020
-# V1.0.0 06-01-2020 catalog.i18nc("@label","Size") on QML
-# V1.0.1 06-20-2020 Add Angle for conical support
-# V2.0.0 07-04-2020 Add Button and custom support type
-# V2.0.1 
-# V2.1.0 10-04-2020 Add Abutment support type
-# V2.2.0 10-05-2020 Add Tube support type
-# V2.3.0 10-18-2020 Add Y direction and Equalize heights for Abutment support type
-# V2.4.0 01-21-2021 New option Max size to limit the size of the base
-# V2.4.1 01-24-2021 By default support are not define with the property support_mesh_drop_down = True
-# V2.5.0 03-07-2021 Freeform (Cross/Section/Pillar/Custom)
-# V2.5.1 03-08-2021 Mirror & Rotate freeform support
-# V2.5.2 03-09-2021 Bridge freeform support Bridge and rename Pillar
-# V2.5.3 03-10-2021 Add "arch-buttress" type
-# V2.5.5 03-11-2021 Minor modification on freeform design
-#
-# V2.6.0 03-05-2022 Update for Cura 5.0
-# V2.6.1 18-05-2022 Update for Cura 5.0 QML with UM.ToolbarButton
-# V2.6.2 19-05-2022 Scale Also in Main direction
-# V2.6.3 25-05-2022 Temporary ? solution for the Toolbar height in QT6
-# V2.6.4 31-05-2022 Add Button Remove All
-#                   Increase the Increment angle for Cylinder and Tube from 2° to 10°
-# V2.6.5 11-07-2022 Change Style of Button for Cura 5.0  5.1
-# V2.6.6 07-08-2022 Internal modification for Maximum Z height
-# V2.7.0 18-01-2023 Prepare translation
-# V2.7.1 02-02-2023 Replace Rotation 180° / Auto Orientation for FreeForm Model
-#
-# V2.8.0 09-02-2023 Add Define As Model For Cylindrical Model
-#--------------------------------------------------------------------------------------------
 # Release history for Reborn version by Slashee the Cow 2025-
 #--------------------------------------------------------------------------------------------
 # v1.0.0 - Initial release.
@@ -55,7 +19,7 @@
 #   Changed the icon to illustrate it does more than cylinders. Now it looks like it does rockets.
 #   Renamed "Freeform" to "Model" and "Custom" to "Line" and swapped their positions.
 #   Input validation in the text fields! Resetting if you put in something invalid! Preventing bugs from conflicting settings!
-# v1.0.1 - 2025-02-05
+# v1.0.1
 #   Fixed control panel for Cura versions < 5.7.
 #   Control panel input validation now a little less strict. You can set the support size to above the max size now and it'll change the max size to match.
 # v1.1.0
@@ -63,6 +27,11 @@
 #   -   The inner part of a tube also tapers now!
 #   Changed icons for abutment and model support types.
 #   Model combo box now remembers what model you had selected.
+# v1.2.0
+#   Supercharged input validation! Okay, so it's not as fun a headline feature as last time. But it will either save or cause you lots of frustration!
+#       Not as fun a subheadline as last time, but why fix invalid settings yourself when you can get the plugin to do it. (Answer: you don't like the plugin's defaults)
+#   Behind-the-scenes improvements to the control panel while I was there. You'll notice it by its absence. Of gaps.
+#   Dusted a few more cobwebs out.
 
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtWidgets import QApplication
@@ -149,7 +118,7 @@ class CustomSupportsReborn(Tool):
 
         self._catalog = i18nCatalog("customsupportsreborn")
 
-        self.setExposedProperties("SupportType", "ModelSubtype", "SupportSize", "SupportSizeTapered", "WallWidth", "TaperAngle", "SupportYDirection", "AbutmentEqualizeHeights", "ModelScaleMain", "ModelOrient", "ModelMirror", "PanelRemoveAllText")
+        self.setExposedProperties("SupportType", "ModelSubtype", "SupportSize", "TaperedSize", "WallWidth", "TaperAngle", "SupportYDirection", "AbutmentEqualizeHeights", "ModelScaleMain", "ModelOrient", "ModelMirror", "PanelRemoveAllText", "LogMessage")
 
         self._supports_created: list[SceneNode] = []
         
@@ -158,7 +127,7 @@ class CustomSupportsReborn(Tool):
         
         # variable for menu dialog        
         self._support_size: float = 2.0
-        self._support_size_tapered: float = 10.0
+        self._tapered_size: float = 10.0
         self._wall_width: float = 0.0
         self._taper_angle: float = 0.0
         self._support_y_direction: bool = False
@@ -198,7 +167,7 @@ class CustomSupportsReborn(Tool):
         # set the preferences to store the default value
         self._preferences = CuraApplication.getInstance().getPreferences()
         self._preferences.addPreference("customsupportsreborn/support_size", 5)
-        self._preferences.addPreference("customsupportsreborn/support_size_tapered", 10)
+        self._preferences.addPreference("customsupportsreborn/tapered_size", 10)
         self._preferences.addPreference("customsupportsreborn/wall_width", 2)
         self._preferences.addPreference("customsupportsreborn/taper_angle", 0)
         self._preferences.addPreference("customsupportsreborn/support_y_direction", False)
@@ -209,9 +178,8 @@ class CustomSupportsReborn(Tool):
         self._preferences.addPreference("customsupportsreborn/support_type", SUPPORT_TYPE_CYLINDER)
         self._preferences.addPreference("customsupportsreborn/model_subtype", "cross")
         
-        # convert as float to avoid further issue
         self._support_size = float(self._preferences.getValue("customsupportsreborn/support_size"))
-        self._support_size_tapered = float(self._preferences.getValue("customsupportsreborn/support_size_tapered"))
+        self._tapered_size = float(self._preferences.getValue("customsupportsreborn/tapered_size"))
         self._wall_width = float(self._preferences.getValue("customsupportsreborn/wall_width"))
         self._taper_angle = float(self._preferences.getValue("customsupportsreborn/taper_angle"))
         # convert as boolean to avoid further issue
@@ -327,8 +295,11 @@ class CustomSupportsReborn(Tool):
             
         node.setSelectable(True)
 
-        # Prevent big circus tents.
-        use_taper_angle = self._taper_angle if self._support_size != self._support_size_tapered else 0
+        # Clamp sizes in case of a mismatch between inwards/outwards taper angle and tapered size
+        tapered_size = self._tapered_size
+        if (self._taper_angle > 0 and self._tapered_size < self._support_size) or \
+        (self._taper_angle < 0 and self._tapered_size > self._support_size):
+            tapered_size = self._support_size
         
         # long=Support Height
         self._length=position_start.y
@@ -336,7 +307,7 @@ class CustomSupportsReborn(Tool):
         
         # Limitation for support height to Node Height
         # For Cube/Cylinder/Tube
-        # Test with 0.5 because the precision on the clic poisition is not very thight 
+        # Test with 0.5 because the precision on the click position is not very high
         if self._length >= (self._nodeHeight-0.5) :
             # additionale length
             self._top_added_height = 0
@@ -352,13 +323,13 @@ class CustomSupportsReborn(Tool):
             
         if self._support_type == SUPPORT_TYPE_CYLINDER:
             # Cylinder creation Diameter , Maximum diameter , Increment angle 10°, length , top Additional Height, Angle of the support
-            mesh = self._createCylinder(self._support_size, self._support_size_tapered, 10, self._length, self._top_added_height, self._taper_angle)
+            mesh = self._createCylinder(self._support_size, tapered_size, 10, self._length, self._top_added_height, self._taper_angle)
         elif self._support_type == SUPPORT_TYPE_TUBE:
             # Tube creation Diameter ,Maximum diameter , Diameter Int, Increment angle 10°, length, top Additional Height , Angle of the support
-            mesh =  self._createTube(self._support_size, self._support_size_tapered, self._wall_width, 10, self._length, self._top_added_height, self._taper_angle)
+            mesh =  self._createTube(self._support_size, tapered_size, self._wall_width, 10, self._length, self._top_added_height, self._taper_angle)
         elif self._support_type == SUPPORT_TYPE_CUBE:
             # Cube creation Size,Maximum Size , length , top Additional Height, Angle of the support
-            mesh =  self._createCube(self._support_size, self._support_size_tapered, self._length, self._top_added_height, self._taper_angle)
+            mesh =  self._createCube(self._support_size, tapered_size, self._length, self._top_added_height, self._taper_angle)
         elif self._support_type == SUPPORT_TYPE_MODEL:
             # Cube creation Size , length
             mesh = MeshBuilder()  
@@ -440,16 +411,18 @@ class CustomSupportsReborn(Tool):
             log('d', 'Abutment top : ' + str(self._top))
             # Logger.log('d', 'MaxSize : ' + str(self._MaxSize))
             
-            mesh =  self._createAbutment(self._support_size,self._support_size_tapered,self._length,self._top,self._taper_angle,self._support_y_direction)
-        else:           
+            mesh =  self._createAbutment(self._support_size,tapered_size,self._length,self._top,self._taper_angle,self._support_y_direction)
+        elif self._support_type == SUPPORT_TYPE_LINE:
             # Custom creation Size , P1 as vector P2 as vector
             # Get support_interface_height as extra distance 
             extruder_stack = self._application.getExtruderManager().getActiveExtruderStacks()[0]
             if self._top_added_height == 0 :
                 extra_top = 0
             else :
-                extra_top=extruder_stack.getProperty("support_interface_height", "value")            
-            mesh =  self._createLine(self._support_size,self._support_size_tapered,position_start,position_end,self._taper_angle,extra_top)
+                extra_top=extruder_stack.getProperty("support_interface_height", "value")
+            mesh =  self._createLine(self._support_size,tapered_size,position_start,position_end,self._taper_angle,extra_top)
+        else:
+            log("e", f"Tried to create support with invalid support type set: {self._support_type}")
 
         # Mesh Model are loaded via trimesh doesn't aheve the Build method
         if self._support_type != 'model':
@@ -934,7 +907,8 @@ class CustomSupportsReborn(Tool):
         """
         # Logger.log('d', 'Ydir : ' + str(ydir))
         mesh = MeshBuilder()
-
+        if taper_angle < 0:  # We don't taper inwards around here
+            taper_angle - 0
         radius = top_width / 2 # Using 'top_width' for 'diameter' parameter name meaning
         max_radius = minmax_width / 2 # Using 'bottom_width' for 'max_diameter' parameter name meaning
         bottom_diameter = math.tan(math.radians(taper_angle)) * (total_height + top_offset) + (2 * radius) # Original formula for bottom_diameter
@@ -944,18 +918,6 @@ class CustomSupportsReborn(Tool):
         else:
             taper_length = total_height
         
-        
-        # Debug Log Lines
-        # Logger.log('d', 's_inf : ' + str(s_inf))
-        # Logger.log('d', 'l_max : ' + str(l_max)) 
-        # Logger.log('d', 'l : ' + str(l))
-        
-        # Difference between Standart Abutment and Abutment + max base size
-
-        # Debug Log Lines
-        # Logger.log('d', 's_inf : ' + str(s_inf))
-        # Logger.log('d', 'l_max : ' + str(l_max)) 
-        # Logger.log('d', 'l : ' + str(l))
         
         # Difference between Standart Abutment and Abutment + max base size
         if taper_length < total_height and taper_length > 0:
@@ -1593,22 +1555,22 @@ class CustomSupportsReborn(Tool):
     
     #supportSize = property(getSupportSize, setSupportSize)
 
-    def getSupportSizeTapered(self) -> float:
-        return self._support_size_tapered
+    def getTaperedSize(self) -> float:
+        return self._tapered_size
   
-    def setSupportSizeTapered(self, new_size: str) -> None:
+    def setTaperedSize(self, new_size: str) -> None:
         try:
             new_value = float(new_size)
         except ValueError:
             return
 
         if new_value < 0:
-            log("i", "Tried to set SupportSizeTapered to < 0")
+            log("i", "Tried to set TaperedSize to < 0")
             return
         
-        self._support_size_tapered = new_value
-        self._preferences.setValue("customsupportsreborn/support_size_tapered", new_value)
-        log("d", f"CustomSupportsReborn._support_size_tapered being set to {new_value}")
+        self._tapered_size = new_value
+        self._preferences.setValue("customsupportsreborn/tapered_size", new_value)
+        log("d", f"CustomSupportsReborn._tapered_size being set to {new_value}")
         self.propertyChanged.emit()
     
     #supportSizeTapered = property(getSupportSizeTapered, setSupportSizeTapered)
@@ -1636,6 +1598,7 @@ class CustomSupportsReborn(Tool):
     #wallWidth = property(getWallWidth, setWallWidth)
         
     def getTaperAngle(self) -> float:
+        log("d", f"CustomSupportsReborn._taper_angle being read as {self._taper_angle} of type {type(self._taper_angle)}")
         return self._taper_angle
   
     def setTaperAngle(self, new_angle: str) -> None:
@@ -1647,7 +1610,7 @@ class CustomSupportsReborn(Tool):
         # Logger.log('d', 's_value : ' + str(s_value))        
         self._taper_angle = new_value
         self._preferences.setValue("customsupportsreborn/taper_angle", new_value)
-        log("d", f"CustomSupportsReborn._taper_angle being set to {new_value}")
+        log("d", f"CustomSupportsReborn._taper_angle has been set to {self._taper_angle}")
         self.propertyChanged.emit()
 
     #taperAngle = property(getTaperAngle, setTaperAngle)
@@ -1777,5 +1740,11 @@ class CustomSupportsReborn(Tool):
         self._preferences.setValue("customsupportsreborn/model_mirror", new_value)
         log("d", f"CustomSupportsReborn._model_mirror being set to {new_value}")
         self.propertyChanged.emit()
-
     #modelMirror = property(getModelMirror, setModelMirror)
+
+    def getLogMessage(self) -> str | None:
+        return None
+    
+    def setLogMessage(self, message: str) -> None:
+        log("i", f"CustomSupportsReborn QML Log: {message}")
+        self.propertyChanged.emit()
