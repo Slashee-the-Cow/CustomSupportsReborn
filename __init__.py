@@ -8,7 +8,7 @@ from UM.i18n import i18nCatalog
 i18n_catalog = i18nCatalog("customsupportsreborn")
 
 def getMetaData():
-    """Tell Cura all about CustomSupportsReborn"""
+    # Tell Cura all about CustomSupportsReborn
     return {
         "tool": {
             "name": i18n_catalog.i18nc("@tool:name", "Custom Supports Reborn"),
@@ -20,5 +20,5 @@ def getMetaData():
     }
 
 def register(app):
-    """Register tool so Cura can access it."""
+    # Register tool so Cura can access it.
     return { "tool": CustomSupportsReborn.CustomSupportsReborn() }

@@ -8,42 +8,6 @@
 ##--------------------------------------------------------------------------------------------
 # All modifications 15 April-2020 to 13 March 2023 Copyright(c) 5@xes 
 #--------------------------------------------------------------------------------------------
-# First release 05-18-2020  to change the initial plugin into cylindric support
-# Modif 0.01 : Cylinder length -> Pick Point to base plate height
-# Modif 0.02 : Using  support_tower_diameter as variable to define the cylinder
-# Modif 0.03 : Using a special parameter  diameter_custom_support as variable to define the cylinder
-# Modif 0.04 : Add a text field to define the diameter
-# Modif 0.05 : Add checkbox and option to switch between Cube / Cylinder
-# Modif 0.06 : Symplify code and store defaut size support in Preference "customsupportcylinder/s_size" default value 5
-# V0.9.0 05-20-2020
-# V1.0.0 06-01-2020 catalog.i18nc("@label","Size") on QML
-# V1.0.1 06-20-2020 Add Angle for conical support
-# V2.0.0 07-04-2020 Add Button and custom support type
-# V2.0.1 
-# V2.1.0 10-04-2020 Add Abutment support type
-# V2.2.0 10-05-2020 Add Tube support type
-# V2.3.0 10-18-2020 Add Y direction and Equalize heights for Abutment support type
-# V2.4.0 01-21-2021 New option Max size to limit the size of the base
-# V2.4.1 01-24-2021 By default support are not define with the property support_mesh_drop_down = True
-# V2.5.0 03-07-2021 Freeform (Cross/Section/Pillar/Custom)
-# V2.5.1 03-08-2021 Mirror & Rotate freeform support
-# V2.5.2 03-09-2021 Bridge freeform support Bridge and rename Pillar
-# V2.5.3 03-10-2021 Add "arch-buttress" type
-# V2.5.5 03-11-2021 Minor modification on freeform design
-#
-# V2.6.0 03-05-2022 Update for Cura 5.0
-# V2.6.1 18-05-2022 Update for Cura 5.0 QML with UM.ToolbarButton
-# V2.6.2 19-05-2022 Scale Also in Main direction
-# V2.6.3 25-05-2022 Temporary ? solution for the Toolbar height in QT6
-# V2.6.4 31-05-2022 Add Button Remove All
-#                   Increase the Increment angle for Cylinder and Tube from 2° to 10°
-# V2.6.5 11-07-2022 Change Style of Button for Cura 5.0  5.1
-# V2.6.6 07-08-2022 Internal modification for Maximum Z height
-# V2.7.0 18-01-2023 Prepare translation
-# V2.7.1 02-02-2023 Replace Rotation 180° / Auto Orientation for FreeForm Model
-#
-# V2.8.0 09-02-2023 Add Define As Model For Cylindrical Model
-#--------------------------------------------------------------------------------------------
 # Release history for Reborn version by Slashee the Cow 2025-
 #--------------------------------------------------------------------------------------------
 # v1.0.0 - Initial release.
@@ -55,20 +19,27 @@
 #   Changed the icon to illustrate it does more than cylinders. Now it looks like it does rockets.
 #   Renamed "Freeform" to "Model" and "Custom" to "Line" and swapped their positions.
 #   Input validation in the text fields! Resetting if you put in something invalid! Preventing bugs from conflicting settings!
-# v1.0.1 - 2025-02-05
+# v1.0.1
 #   Fixed control panel for Cura versions < 5.7.
 #   Control panel input validation now a little less strict. You can set the support size to above the max size now and it'll change the max size to match.
+# v1.1.0
+#   Headline: now you can taper inwards!
+#   -   The inner part of a tube also tapers now!
+#   Changed icons for abutment and model support types.
+#   Model combo box now remembers what model you had selected.
+# v1.2.0
+#   Supercharged input validation! Okay, so it's not as fun a headline feature as last time. But it will either save or cause you lots of frustration!
+#       Not as fun a subheadline as last time, but why fix invalid settings yourself when you can get the plugin to do it. (Answer: you don't like the plugin's defaults)
+#   Behind-the-scenes improvements to the control panel while I was there. You'll notice it by its absence. Of gaps.
+#   Dusted a few more cobwebs out.
 
-from PyQt6.QtCore import Qt, QTimer, QObject, QVariant, pyqtProperty
-from PyQt6.QtQml import qmlRegisterType
+from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtWidgets import QApplication
 
 import math
 import numpy
 import os.path
 import trimesh
-
-from typing import Optional, List
 
 from cura.CuraApplication import CuraApplication
 from cura.PickingPass import PickingPass
@@ -98,15 +69,11 @@ from UM.Settings.SettingInstance import SettingInstance
 from UM.Resources import Resources
 from UM.i18n import i18nCatalog
 
-#i18n_cura_catalog = i18nCatalog("cura")
-#i18n_printer_catalog = i18nCatalog("fdmprinter.def.json")
-#i18n_extrud_catalog = i18nCatalog("fdmextruder.def.json")
-
 #Resources.addSearchPath(
 #    os.path.join(os.path.abspath(os.path.dirname(__file__)))
 #)  # Plugin translation file import
 
-#i18n_catalog = i18nCatalog("customsupportsreborn")
+i18n_catalog = i18nCatalog("customsupportsreborn")
 
 #if i18n_catalog.hasTranslationLoaded():
 #    Logger.log("i", "Custom Supports Reborn translation loaded")
@@ -139,7 +106,6 @@ class CustomSupportsReborn(Tool):
 
     #_translations = CustomSupportsRebornTranslations()
     #plugin_name = "@CustomSupportsReborn:"
-    #propertyChanged = pyqtSignal(str)
 
     def __init__(self):
        
@@ -152,28 +118,28 @@ class CustomSupportsReborn(Tool):
 
         self._catalog = i18nCatalog("customsupportsreborn")
 
-        self.setExposedProperties("SupportType", "SupportSubtype", "SupportSize", "SupportSizeMax", "SupportSizeInner", "SupportAngle", "SupportYDirection", "AbutmentEqualizeHeights", "ModelScaleMain", "ModelOrient", "ModelMirror", "PanelRemoveAllText")
+        self.setExposedProperties("SupportType", "ModelSubtype", "SupportSize", "TaperedSize", "WallWidth", "TaperAngle", "SupportYDirection", "AbutmentEqualizeHeights", "ModelScaleMain", "ModelOrient", "ModelMirror", "PanelRemoveAllText", "LogMessage")
 
-        self._supports_created: List[SceneNode] = []
+        self._supports_created: list[SceneNode] = []
         
         self._line_points: int = 0  
         self._support_heights: float = 0.0
         
         # variable for menu dialog        
         self._support_size: float = 2.0
-        self._support_size_max: float = 10.0
-        self._support_size_inner: float = 0.0
-        self._support_angle: float = 0.0
+        self._tapered_size: float = 10.0
+        self._wall_width: float = 0.0
+        self._taper_angle: float = 0.0
         self._support_y_direction: bool = False
         self._abutment_equalize_heights: bool = True
         self._model_scale_main: bool = True
         self._model_orient: bool = False
         self._model_mirror: bool = False
-        self._support_type: str = 'cylinder'
-        self._support_subtype: str = 'cross'
+        self._support_type: str = SUPPORT_TYPE_CYLINDER
+        self._model_subtype: str = "cross"
         self._model_hide_message:bool = False # To avoid message 
         self._panel_remove_all_text: str = self._catalog.i18nc("panel:remove_all", "Remove All")
-        
+
         # Shortcut
         self._shortcut_key: Qt.Key = Qt.Key.Key_F
             
@@ -182,6 +148,7 @@ class CustomSupportsReborn(Tool):
 
         self._custom_point_location: Vector = Vector(0,0,0)
         self._selection_pass: SceneNode = None
+
         
         
         # Note: if the selection is cleared with this tool active, there is no way to switch to
@@ -200,22 +167,21 @@ class CustomSupportsReborn(Tool):
         # set the preferences to store the default value
         self._preferences = CuraApplication.getInstance().getPreferences()
         self._preferences.addPreference("customsupportsreborn/support_size", 5)
-        self._preferences.addPreference("customsupportsreborn/support_size_max", 10)
-        self._preferences.addPreference("customsupportsreborn/support_size_inner", 2)
-        self._preferences.addPreference("customsupportsreborn/support_angle", 0)
+        self._preferences.addPreference("customsupportsreborn/tapered_size", 10)
+        self._preferences.addPreference("customsupportsreborn/wall_width", 2)
+        self._preferences.addPreference("customsupportsreborn/taper_angle", 0)
         self._preferences.addPreference("customsupportsreborn/support_y_direction", False)
         self._preferences.addPreference("customsupportsreborn/abutment_equalize_heights", True)
         self._preferences.addPreference("customsupportsreborn/model_scale_main", True)
         self._preferences.addPreference("customsupportsreborn/model_orient", False)
         self._preferences.addPreference("customsupportsreborn/model_mirror", False)
         self._preferences.addPreference("customsupportsreborn/support_type", SUPPORT_TYPE_CYLINDER)
-        self._preferences.addPreference("customsupportsreborn/support_subtype", "cross")
+        self._preferences.addPreference("customsupportsreborn/model_subtype", "cross")
         
-        # convert as float to avoid further issue
         self._support_size = float(self._preferences.getValue("customsupportsreborn/support_size"))
-        self._support_size_max = float(self._preferences.getValue("customsupportsreborn/support_size_max"))
-        self._support_size_inner = float(self._preferences.getValue("customsupportsreborn/support_size_inner"))
-        self._support_angle = float(self._preferences.getValue("customsupportsreborn/support_angle"))
+        self._tapered_size = float(self._preferences.getValue("customsupportsreborn/tapered_size"))
+        self._wall_width = float(self._preferences.getValue("customsupportsreborn/wall_width"))
+        self._taper_angle = float(self._preferences.getValue("customsupportsreborn/taper_angle"))
         # convert as boolean to avoid further issue
         self._support_y_direction = bool(self._preferences.getValue("customsupportsreborn/support_y_direction"))
         self._abutment_equalize_heights = bool(self._preferences.getValue("customsupportsreborn/abutment_equalize_heights"))
@@ -225,14 +191,14 @@ class CustomSupportsReborn(Tool):
         # convert as string to avoid further issue
         self._support_type = str(self._preferences.getValue("customsupportsreborn/support_type"))
         # Sub type for Free Form support
-        self._support_subtype = str(self._preferences.getValue("customsupportsreborn/support_subtype"))
+        self._model_subtype = str(self._preferences.getValue("customsupportsreborn/model_subtype"))
 
                 
     def event(self, event):
         super().event(event)
         modifiers = QApplication.keyboardModifiers()
         ctrl_is_active = modifiers & Qt.KeyboardModifier.ControlModifier
-        shift_is_active = modifiers & Qt.KeyboardModifier.ShiftModifier
+        # shift_is_active = modifiers & Qt.KeyboardModifier.ShiftModifier
         alt_is_active = modifiers & Qt.KeyboardModifier.AltModifier
 
         
@@ -329,8 +295,11 @@ class CustomSupportsReborn(Tool):
             
         node.setSelectable(True)
 
-        # Prevent big circus tents.
-        use_support_angle = self._support_angle if self._support_size != self._support_size_max else 0
+        # Clamp sizes in case of a mismatch between inwards/outwards taper angle and tapered size
+        tapered_size = self._tapered_size
+        if (self._taper_angle > 0 and self._tapered_size < self._support_size) or \
+        (self._taper_angle < 0 and self._tapered_size > self._support_size):
+            tapered_size = self._support_size
         
         # long=Support Height
         self._length=position_start.y
@@ -338,7 +307,7 @@ class CustomSupportsReborn(Tool):
         
         # Limitation for support height to Node Height
         # For Cube/Cylinder/Tube
-        # Test with 0.5 because the precision on the clic poisition is not very thight 
+        # Test with 0.5 because the precision on the click position is not very high
         if self._length >= (self._nodeHeight-0.5) :
             # additionale length
             self._top_added_height = 0
@@ -354,17 +323,17 @@ class CustomSupportsReborn(Tool):
             
         if self._support_type == SUPPORT_TYPE_CYLINDER:
             # Cylinder creation Diameter , Maximum diameter , Increment angle 10°, length , top Additional Height, Angle of the support
-            mesh = self._createCylinder(self._support_size, self._support_size_max, 10, self._length, self._top_added_height, use_support_angle)
+            mesh = self._createCylinder(self._support_size, tapered_size, 10, self._length, self._top_added_height, self._taper_angle)
         elif self._support_type == SUPPORT_TYPE_TUBE:
             # Tube creation Diameter ,Maximum diameter , Diameter Int, Increment angle 10°, length, top Additional Height , Angle of the support
-            mesh =  self._createTube(self._support_size, self._support_size_max, self._support_size_inner, 10, self._length, self._top_added_height, use_support_angle)
+            mesh =  self._createTube(self._support_size, tapered_size, self._wall_width, 10, self._length, self._top_added_height, self._taper_angle)
         elif self._support_type == SUPPORT_TYPE_CUBE:
             # Cube creation Size,Maximum Size , length , top Additional Height, Angle of the support
-            mesh =  self._createCube(self._support_size, self._support_size_max, self._length, self._top_added_height, use_support_angle)
+            mesh =  self._createCube(self._support_size, tapered_size, self._length, self._top_added_height, self._taper_angle)
         elif self._support_type == SUPPORT_TYPE_MODEL:
             # Cube creation Size , length
             mesh = MeshBuilder()  
-            model_definition_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "models", self._support_subtype + ".stl")
+            model_definition_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "models", self._model_subtype + ".stl")
             # Logger.log('d', 'Model_definition_path : ' + str(model_definition_path)) 
             load_mesh = trimesh.load(model_definition_path)
             origin = [0, 0, 0]
@@ -442,16 +411,18 @@ class CustomSupportsReborn(Tool):
             log('d', 'Abutment top : ' + str(self._top))
             # Logger.log('d', 'MaxSize : ' + str(self._MaxSize))
             
-            mesh =  self._createAbutment(self._support_size,self._support_size_max,self._length,self._top,use_support_angle,self._support_y_direction)
-        else:           
+            mesh =  self._createAbutment(self._support_size,tapered_size,self._length,self._top,self._taper_angle,self._support_y_direction)
+        elif self._support_type == SUPPORT_TYPE_LINE:
             # Custom creation Size , P1 as vector P2 as vector
             # Get support_interface_height as extra distance 
             extruder_stack = self._application.getExtruderManager().getActiveExtruderStacks()[0]
             if self._top_added_height == 0 :
                 extra_top = 0
             else :
-                extra_top=extruder_stack.getProperty("support_interface_height", "value")            
-            mesh =  self._createLine(self._support_size,self._support_size_max,position_start,position_end,use_support_angle,extra_top)
+                extra_top=extruder_stack.getProperty("support_interface_height", "value")
+            mesh =  self._createLine(self._support_size,tapered_size,position_start,position_end,self._taper_angle,extra_top)
+        else:
+            log("e", f"Tried to create support with invalid support type set: {self._support_type}")
 
         # Mesh Model are loaded via trimesh doesn't aheve the Build method
         if self._support_type != 'model':
@@ -523,10 +494,10 @@ class CustomSupportsReborn(Tool):
 
     # Source code from MeshTools Plugin 
     # Copyright (c) 2020 Aldo Hoeben / fieldOfView
-    def _getAllSelectedNodes(self) -> List[SceneNode]:
+    def _getAllSelectedNodes(self) -> list[SceneNode]:
         selection = Selection.getAllSelectedObjects()[:]
         if selection:
-            deep_selection = []  # type: List[SceneNode]
+            deep_selection = []  # type: list[SceneNode]
             for selected_node in selection:
                 if selected_node.hasChildren():
                     deep_selection = deep_selection + selected_node.getAllChildren()
@@ -644,7 +615,7 @@ class CustomSupportsReborn(Tool):
                         # Logger.log('d', "Angle Cosinus   : {}".format(math.degrees(LeCos)))
                         # Logger.log('d', "Chose Angle     : {}".format(math.degrees(Angle)))
         return angle
-        
+    
     def _removeSupportMesh(self, node: CuraSceneNode):
         parent = node.getParent()
         if parent == self._controller.getScene().getRoot():
@@ -717,220 +688,453 @@ class CustomSupportsReborn(Tool):
         return mesh_data
         
     # Cube Creation
-    def _createCube(self, base_width, max_width, total_height, top_offset, taper_angle):
+    def _createCube(self, base_side, minmax_side, length, top_additional_height, taper_angle):
         mesh = MeshBuilder()
 
-        # Intial Comment from Ultimaker B.V. I have never try to verify this point
-        # Can't use MeshBuilder.addCube() because that does not get per-vertex normals
-        # Per-vertex normals require duplication of vertices
-        half_base_width = base_width / 2
-        half_max_width = max_width / 2
-        bottom_width_tapered = half_base_width + math.tan(math.radians(taper_angle)) * (total_height + top_offset)
-        
-        if half_max_width>half_base_width and taper_angle!=0:
-            taper_length = (half_max_width - half_base_width) / math.tan(math.radians(taper_angle))
-        else :
-            taper_length = total_height
-        
-        # Difference between Cone and Cone + max base size
-        if taper_length < total_height and taper_length > 0:
-            vertices_per_face=40        
-            vertices = [ # 10 faces with 4 corners each
-                [-half_max_width, -taper_length,  half_max_width], [-half_base_width,  top_offset,  half_base_width], [ half_base_width,  top_offset,  half_base_width], [ half_max_width, -taper_length,  half_max_width],
-                [-half_base_width,  top_offset, -half_base_width], [-half_max_width, -taper_length, -half_max_width], [ half_max_width, -taper_length, -half_max_width], [ half_base_width,  top_offset, -half_base_width],
-                [-half_max_width, -total_height,  half_max_width], [-half_max_width,  -taper_length,  half_max_width], [ half_max_width,  -taper_length,  half_max_width], [ half_max_width, -total_height,  half_max_width],
-                [-half_max_width,  -taper_length, -half_max_width], [-half_max_width, -total_height, -half_max_width], [ half_max_width, -total_height, -half_max_width], [ half_max_width,  -taper_length, -half_max_width],
-                [ half_max_width, -total_height, -half_max_width], [-half_max_width, -total_height, -half_max_width], [-half_max_width, -total_height,  half_max_width], [ half_max_width, -total_height,  half_max_width],
-                [-half_base_width,  top_offset, -half_base_width], [ half_base_width,  top_offset, -half_base_width], [ half_base_width,  top_offset,  half_base_width], [-half_base_width,  top_offset,  half_base_width],
-                [-half_max_width, -total_height,  half_max_width], [-half_max_width, -total_height, -half_max_width], [-half_max_width,  -taper_length, -half_max_width], [-half_max_width,  -taper_length,  half_max_width],
-                [ half_max_width, -total_height, -half_max_width], [ half_max_width, -total_height,  half_max_width], [ half_max_width,  -taper_length,  half_max_width], [ half_max_width,  -taper_length, -half_max_width],  
-                [-half_max_width, -taper_length,  half_max_width], [-half_max_width, -taper_length, -half_max_width], [-half_base_width,  top_offset, -half_base_width], [-half_base_width,  top_offset,  half_base_width],
-                [ half_max_width, -taper_length, -half_max_width], [ half_max_width, -taper_length,  half_max_width], [ half_base_width,  top_offset,  half_base_width], [ half_base_width,  top_offset, -half_base_width]
-            ]       
+        half_base_side = base_side / 2
+        half_minmax_side = minmax_side / 2
+        total_height = length # Renamed total_height to length for consistency
+        top_offset = top_additional_height # Renamed top_offset to top_additional_height for consistency
+
+        if taper_angle > 0: # Outward taper (positive angle)
+            bottom_width_tapered = half_base_side + math.tan(math.radians(taper_angle)) * (total_height + top_offset)
+            bottom_width_tapered = min(bottom_width_tapered, half_minmax_side) # Limit by minmax_side if outward taper
+
+        elif taper_angle < 0: # Inward taper (negative angle)
+            bottom_width_tapered = half_base_side - math.tan(math.radians(abs(taper_angle))) * (total_height + top_offset) # Subtract for inward taper
+            bottom_width_tapered = max(bottom_width_tapered, half_minmax_side) # Limit by minmax_side if inward taper - MINIMUM size
+
+        else: # No taper (taper_angle == 0)
+            bottom_width_tapered = half_base_side # Straight cube
+
+        if half_minmax_side > half_base_side and taper_angle!=0: # Taper length calculation - outward taper
+            taper_length_val = (half_minmax_side - half_base_side) / math.tan(math.radians(taper_angle))
+            taper_length = min(taper_length_val, total_height)
+        elif half_minmax_side < half_base_side and taper_angle!=0: # Taper length calculation - inward taper
+             taper_length_val = (half_base_side - half_minmax_side) / math.tan(math.radians(abs(taper_angle))) # Use abs for angle
+             taper_length = min(taper_length_val, total_height)
         else:
-            vertices_per_face=24        
-            vertices = [ # 6 faces with 4 corners each
-                [-bottom_width_tapered, -total_height,  bottom_width_tapered], [-half_base_width,  top_offset,  half_base_width], [ half_base_width,  top_offset,  half_base_width], [ bottom_width_tapered, -total_height,  bottom_width_tapered],
-                [-half_base_width,  top_offset, -half_base_width], [-bottom_width_tapered, -total_height, -bottom_width_tapered], [ bottom_width_tapered, -total_height, -bottom_width_tapered], [ half_base_width,  top_offset, -half_base_width],
-                [ bottom_width_tapered, -total_height, -bottom_width_tapered], [-bottom_width_tapered, -total_height, -bottom_width_tapered], [-bottom_width_tapered, -total_height,  bottom_width_tapered], [ bottom_width_tapered, -total_height,  bottom_width_tapered],
-                [-half_base_width,  top_offset, -half_base_width], [ half_base_width,  top_offset, -half_base_width], [ half_base_width,  top_offset,  half_base_width], [-half_base_width,  top_offset,  half_base_width],
-                [-bottom_width_tapered, -total_height,  bottom_width_tapered], [-bottom_width_tapered, -total_height, -bottom_width_tapered], [-half_base_width,  top_offset, -half_base_width], [-half_base_width,  top_offset,  half_base_width],
-                [ bottom_width_tapered, -total_height, -bottom_width_tapered], [ bottom_width_tapered, -total_height,  bottom_width_tapered], [ half_base_width,  top_offset,  half_base_width], [ half_base_width,  top_offset, -half_base_width]
-            ]
-        mesh.setVertices(numpy.asarray(vertices, dtype=numpy.float32))
+            taper_length = total_height
 
-        indices = []
-        for i in range(0, vertices_per_face, 4): # All 6 quads (12 triangles)
-            indices.append([i, i+2, i+1])
-            indices.append([i, i+3, i+2])
+
+        negative_length = -total_height
+        taper_negative_length = -taper_length
+
+        top_face_vertices = []
+        bottom_face_vertices_taper = []
+        bottom_face_vertices_straight = [] # Might be used later
+
+        if taper_length <= total_height and taper_length > 0: # Tapered case
+            # 1. Generate vertices for top face (square, side base_side) - SAME AS BEFORE
+            y_top = top_additional_height
+            half_side_top = half_base_side
+            top_face_vertices.extend([
+                [-half_side_top, y_top, half_side_top],
+                [half_side_top, y_top, half_side_top],
+                [half_side_top, y_top, -half_side_top],
+                [-half_side_top, y_top, -half_side_top]
+            ])
+
+            # 2. Generate vertices for bottom face of tapered section (square, side bottom_width_tapered) - SAME AS BEFORE
+            y_bottom_taper = taper_negative_length
+            half_side_bottom_taper = bottom_width_tapered
+            bottom_face_vertices_taper.extend([
+                [-half_side_bottom_taper, y_bottom_taper, half_side_bottom_taper],
+                [half_side_bottom_taper, y_bottom_taper, half_side_bottom_taper],
+                [half_side_bottom_taper, y_bottom_taper, -half_side_bottom_taper],
+                [-half_side_bottom_taper, y_bottom_taper, -half_side_bottom_taper]
+            ])
+
+            # 3. Generate vertices for bottom face of STRAIGHT section (square, side bottom_width_tapered) - NEW for straight section below taper
+            y_bottom_straight = negative_length # Bottom of straight section is at negative_length
+            half_side_bottom_straight = bottom_width_tapered # Straight section has same width as bottom of taper
+            bottom_face_vertices_straight.extend([
+                [-half_side_bottom_straight, y_bottom_straight, half_side_bottom_straight],
+                [half_side_bottom_straight, y_bottom_straight, half_side_bottom_straight],
+                [half_side_bottom_straight, y_bottom_straight, -half_side_bottom_straight],
+                [-half_side_bottom_straight, y_bottom_straight, -half_side_bottom_straight]
+            ])
+
+
+            vertices = [] # Will store vertices for faces
+            indices = [] # Will store indices
+
+            # Face Construction for Tapered Sides - SAME AS BEFORE
+            for i in range(4): # 4 sides of the square
+                v_index_current = i
+                v_index_next = (i + 1) % 4
+
+                # Side Face 'i' of Tapered Section
+                # Triangle 1
+                vertices.append(top_face_vertices[v_index_current])
+                vertices.append(top_face_vertices[v_index_next])
+                vertices.append(bottom_face_vertices_taper[v_index_next])
+                # Triangle 2
+                vertices.append(bottom_face_vertices_taper[v_index_next])
+                vertices.append(bottom_face_vertices_taper[v_index_current])
+                vertices.append(top_face_vertices[v_index_current])
+
+            # Top Face - using top_face_vertices - SAME AS BEFORE
+            # Triangle 1 (Top Face)
+            vertices.append(top_face_vertices[0])
+            vertices.append(top_face_vertices[2])
+            vertices.append(top_face_vertices[1])
+            # Triangle 2 (Top Face)
+            vertices.append(top_face_vertices[0])
+            vertices.append(top_face_vertices[3])
+            vertices.append(top_face_vertices[2])
+
+            # Face Construction for STRAIGHT Section Sides - NEW for straight section below taper
+            for i in range(4):
+                v_index_current = i
+                v_index_next = (i + 1) % 4
+
+                # Side Face 'i' of STRAIGHT Section - Connect bottom of tapered section to bottom of straight section
+                # Triangle 1
+                vertices.append(bottom_face_vertices_taper[v_index_current]) # Top of straight side (bottom of tapered)
+                vertices.append(bottom_face_vertices_taper[v_index_next])   # Top of straight side (bottom of tapered)
+                vertices.append(bottom_face_vertices_straight[v_index_next])# Bottom of straight side
+                # Triangle 2
+                vertices.append(bottom_face_vertices_straight[v_index_next])# Bottom of straight side
+                vertices.append(bottom_face_vertices_straight[v_index_current])# Bottom of straight side
+                vertices.append(bottom_face_vertices_taper[v_index_current]) # Top of straight side (bottom of tapered)
+
+
+            # Conditional Bottom Face - INSIDE IF BLOCK NOW, with condition for full vs partial taper
+            if taper_length == total_height: # Full Taper - Bottom face is at bottom of TAPERED section
+                # Bottom Face - using bottom_face_vertices_taper (reversed vertex order for bottom face)
+                # Triangle 1 (Bottom Face - Full Taper)
+                vertices.append(bottom_face_vertices_taper[0])
+                vertices.append(bottom_face_vertices_taper[1])
+                vertices.append(bottom_face_vertices_taper[2])
+                # Triangle 2 (Bottom Face - Full Taper)
+                vertices.append(bottom_face_vertices_taper[2])
+                vertices.append(bottom_face_vertices_taper[3])
+                vertices.append(bottom_face_vertices_taper[0])
+            else: # Partial Taper - Bottom face is at bottom of STRAIGHT section
+                # Bottom Face of STRAIGHT Section
+                # Triangle 1 (Bottom Face - Partial Taper)
+                vertices.append(bottom_face_vertices_straight[0])
+                vertices.append(bottom_face_vertices_straight[1])
+                vertices.append(bottom_face_vertices_straight[2])
+                # Triangle 2 (Bottom Face - Partial Taper)
+                vertices.append(bottom_face_vertices_straight[2])
+                vertices.append(bottom_face_vertices_straight[3])
+                vertices.append(bottom_face_vertices_straight[0])
+
+
+        else: # Straight cube case (or rectangular prism)
+            half_side_straight = bottom_width_tapered # Use bottom_width_tapered as side for straight cube (it will be equal to half_base_side in straight case)
+            top_face_vertices_straight = []
+            bottom_face_vertices_straight = [] # Reusing this list name, but now for straight cube bottom face
+
+            # 1. Generate vertices for top face (square, side half_side_straight)
+            y_top = top_additional_height
+            half_side_top = half_side_straight # Side of top face is same as bottom for straight cube
+            top_face_vertices_straight.extend([
+                [-half_side_top, y_top, half_side_top],  # TLF - 0
+                [half_side_top, y_top, half_side_top],   # TRF - 1
+                [half_side_top, y_top, -half_side_top],  # TRB - 2
+                [-half_side_top, y_top, -half_side_top]   # TLB - 3
+            ])
+
+            # 2. Generate vertices for bottom face (square, side half_side_straight)
+            y_bottom_straight = negative_length # Bottom at negative_length
+            half_side_bottom_straight = half_side_straight # Side of bottom face is same as top for straight cube
+            bottom_face_vertices_straight.extend([
+                [-half_side_bottom_straight, y_bottom_straight, half_side_bottom_straight],  # BLF - 0
+                [half_side_bottom_straight, y_bottom_straight, half_side_bottom_straight],   # BRF - 1
+                [half_side_bottom_straight, y_bottom_straight, -half_side_bottom_straight],  # BRB - 2
+                [-half_side_bottom_straight, y_bottom_straight, -half_side_bottom_straight]   # BLB - 3
+            ])
+
+            vertices = [] # Will store vertices for faces
+
+            # Face Construction for Straight Cube - 6 faces
+            for i in range(4): # 4 sides
+                v_index_current = i
+                v_index_next = (i + 1) % 4
+
+                # Side Face 'i' - Triangles to form a quad - connecting top and bottom straight faces
+                # Triangle 1
+                vertices.append(top_face_vertices_straight[v_index_current])
+                vertices.append(top_face_vertices_straight[v_index_next])
+                vertices.append(bottom_face_vertices_straight[v_index_next])
+                # Triangle 2
+                vertices.append(bottom_face_vertices_straight[v_index_next])
+                vertices.append(bottom_face_vertices_straight[v_index_current])
+                vertices.append(top_face_vertices_straight[v_index_current])
+
+            # Top Face - using top_face_vertices_straight
+            # Triangle 1 (Top Face)
+            vertices.append(top_face_vertices_straight[0]) # TLF
+            vertices.append(top_face_vertices_straight[2]) # TRB
+            vertices.append(top_face_vertices_straight[1]) # TRF
+            # Triangle 2 (Top Face)
+            vertices.append(top_face_vertices_straight[0]) # TLF
+            vertices.append(top_face_vertices_straight[3]) # TLB
+            vertices.append(top_face_vertices_straight[2]) # TRB
+
+            # Bottom Face - using bottom_face_vertices_straight (reversed vertex order for bottom face)
+            # Triangle 1 (Bottom Face)
+            vertices.append(bottom_face_vertices_straight[0]) # BLF
+            vertices.append(bottom_face_vertices_straight[1]) # BRF
+            vertices.append(bottom_face_vertices_straight[2]) # BRB
+            # Triangle 2 (Bottom Face)
+            vertices.append(bottom_face_vertices_straight[2]) # BRB
+            vertices.append(bottom_face_vertices_straight[3]) # BLB
+            vertices.append(bottom_face_vertices_straight[0]) # BLF
+
+        mesh.setVertices(numpy.asarray(vertices, dtype=numpy.float32)) # Vertices will be added in face construction
+        indices = [] # Generate indices
+        for i in range(0, len(vertices), 3):
+            indices.append([i, i+1, i+2])
         mesh.setIndices(numpy.asarray(indices, dtype=numpy.int32))
-
         mesh.calculateNormals()
         return mesh
         
     # Abutment Creation
-    def _createAbutment(self, diameter, max_diameter, total_height, top_offset, taper_angle, y_mirrored):
+    def _createAbutment(self, top_width, minmax_width, total_height, top_offset, taper_angle, rotate_90_degrees):
         """Creates an abutment mesh.
 
         Args:
-        diameter: The diameter of the base.
-        max_diameter: The maximum diameter (for tapered abutments).
+        top_width: The width of the top rectangular face.
+        bottom_width: The maximum diameter of the base (for tapered abutments).
         total_height: The height of the main body of the abutment.
         top_offset: The additional height added to the top of the abutment.
         taper_angle: The angle of the taper.
-        y_mirrored: Whether the abutment is mirrored in the Y direction.
+        rotate_90_degrees: Whether to rotate the abutment by 90 degrees in the XY plane ("Horizontal Orientation" in UI). (Renamed from y_mirrored)
         """
-        # Logger.log('d', 'Ydir : ' + str(ydir)) 
+        # Logger.log('d', 'Ydir : ' + str(ydir))
         mesh = MeshBuilder()
+        if taper_angle < 0:  # We don't taper inwards around here
+            taper_angle - 0
+        radius = top_width / 2 # Using 'top_width' for 'diameter' parameter name meaning
+        max_radius = minmax_width / 2 # Using 'bottom_width' for 'max_diameter' parameter name meaning
+        bottom_diameter = math.tan(math.radians(taper_angle)) * (total_height + top_offset) + (2 * radius) # Original formula for bottom_diameter
 
-        radius = diameter / 2
-        max_radius = max_diameter / 2
-        bottom_diameter = math.tan(math.radians(taper_angle)) * (total_height + top_offset) + (2 * radius)
-        
         if max_radius > radius and taper_angle != 0:
-            taper_length = (max_radius-radius) / math.tan(math.radians(taper_angle))
-        else :
+            taper_length = (max_radius - radius) / math.tan(math.radians(taper_angle))
+        else:
             taper_length = total_height
         
-        # Debug Log Lines
-        # Logger.log('d', 's_inf : ' + str(s_inf))
-        # Logger.log('d', 'l_max : ' + str(l_max)) 
-        # Logger.log('d', 'l : ' + str(l))
         
         # Difference between Standart Abutment and Abutment + max base size
         if taper_length < total_height and taper_length > 0:
-            vertices_per_segment = 40  
-            if not y_mirrored:
-                vertices = [ # 10 faces with 4 corners each
-                    [-radius, -taper_length,  max_radius], [-radius,  top_offset,  2*radius], [ radius,  top_offset,  2*radius], [ radius, -taper_length,  max_radius],
-                    [-radius,  top_offset, -2*radius], [-radius, -taper_length, -max_radius], [ radius, -taper_length, -max_radius], [ radius,  top_offset, -2*radius],
-                    [-radius, -total_height,  max_radius], [-radius,  -taper_length,  max_radius], [ radius,  -taper_length,  max_radius], [ radius, -total_height,  max_radius],
-                    [-radius,  -taper_length, -max_radius], [-radius, -total_height, -max_radius], [ radius, -total_height, -max_radius], [ radius,  -taper_length, -max_radius],                  
-                    [ radius, -total_height, -max_radius], [-radius, -total_height, -max_radius], [-radius, -total_height,  max_radius], [ radius, -total_height,  max_radius],
-                    [-radius,  top_offset, -2*radius], [ radius,  top_offset, -2*radius], [ radius,  top_offset,  2*radius], [-radius,  top_offset,  2*radius],
-                    [-radius, -taper_length,  max_radius], [-radius, -taper_length, -max_radius], [-radius,  top_offset, -2*radius], [-radius,  top_offset,  2*radius],
-                    [ radius, -taper_length, -max_radius], [ radius, -taper_length,  max_radius], [ radius,  top_offset,  2*radius], [ radius,  top_offset, -2*radius],                   
-                    [-radius, -total_height,  max_radius], [-radius, -total_height, -max_radius], [-radius,  -taper_length, -max_radius], [-radius,  -taper_length,  max_radius],
-                    [ radius, -total_height, -max_radius], [ radius, -total_height,  max_radius], [ radius,  -taper_length,  max_radius], [ radius,  -taper_length, -max_radius]
+            vertices_per_segment = 40
+            if not rotate_90_degrees: # "Vertical" Orientation (rotate_90_degrees == False)
+                vertices = [  # 10 faces with 4 corners each - ORIGINAL VERTEX LIST RESTORED
+                    [-radius, -taper_length, max_radius], [-radius, top_offset, 2 * radius], [radius, top_offset, 2 * radius], [radius, -taper_length, max_radius],
+                    [-radius, top_offset, -2 * radius], [-radius, -taper_length, -max_radius], [radius, -taper_length, -max_radius], [radius, top_offset, -2 * radius],
+                    [-radius, -total_height, max_radius], [-radius, -taper_length, max_radius], [radius, -taper_length, max_radius], [radius, -total_height, max_radius],
+                    [-radius, -taper_length, -max_radius], [-radius, -total_height, -max_radius], [radius, -total_height, -max_radius], [radius, -taper_length, -max_radius],
+                    [radius, -total_height, -max_radius], [-radius, -total_height, -max_radius], [-radius, -total_height, max_radius], [radius, -total_height, max_radius],
+                    [-radius, top_offset, -2 * radius], [radius, top_offset, -2 * radius], [radius, top_offset, 2 * radius], [-radius, top_offset, 2 * radius],
+                    [-radius, -taper_length, max_radius], [-radius, -taper_length, -max_radius], [-radius, top_offset, -2 * radius], [-radius, top_offset, 2 * radius],
+                    [radius, -taper_length, -max_radius], [radius, -taper_length, max_radius], [radius, top_offset, 2 * radius], [radius, top_offset, -2 * radius],
+                    [-radius, -total_height, max_radius], [-radius, -total_height, -max_radius], [-radius, -taper_length, -max_radius], [-radius, -taper_length, max_radius],
+                    [radius, -total_height, -max_radius], [radius, -total_height, max_radius], [radius, -taper_length, max_radius], [radius, -taper_length, -max_radius]
                 ]
-            else:
-                vertices = [ # 10 faces with 4 corners each
-                    [-max_radius, -taper_length,  radius], [-2*radius,  top_offset,  radius], [ 2*radius,  top_offset,  radius], [ max_radius, -taper_length,  radius],
-                    [-2*radius,  top_offset, -radius], [-max_radius, -taper_length, -radius], [ max_radius, -taper_length, -radius], [ 2*radius,  top_offset, -radius],                
-                    [-max_radius, -total_height,  radius], [-max_radius,  -taper_length,  radius], [ max_radius,  -taper_length,  radius], [ max_radius, -total_height,  radius],
-                    [-max_radius,  -taper_length, -radius], [-max_radius, -total_height, -radius], [ max_radius, -total_height, -radius], [ max_radius,  -taper_length, -radius],                         
-                    [ max_radius, -total_height, -radius], [-max_radius, -total_height, -radius], [-max_radius, -total_height,  radius], [ max_radius, -total_height,  radius],
-                    [-2*radius,  top_offset, -radius], [ 2*radius,  top_offset, -radius], [ 2*radius,  top_offset,  radius], [-2*radius,  top_offset,  radius],             
-                    [-max_radius, -taper_length,  radius], [-max_radius, -taper_length, -radius], [-2*radius,  top_offset, -radius], [-2*radius,  top_offset,  radius],
-                    [ max_radius, -taper_length, -radius], [ max_radius, -taper_length,  radius], [ 2*radius,  top_offset,  radius], [ 2*radius,  top_offset, -radius],                                  
-                    [-max_radius, -total_height,  radius], [-max_radius, -total_height, -radius], [-max_radius,  -taper_length, -radius], [-max_radius,  -taper_length,  radius],
-                    [ max_radius, -total_height, -radius], [ max_radius, -total_height,  radius], [ max_radius,  -taper_length,  radius], [ max_radius,  -taper_length, -radius]
-                ]             
-        else:
-            vertices_per_segment=24        
-            if not y_mirrored:
-                vertices = [ # 6 faces with 4 corners each
-                    [-radius, -total_height,  bottom_diameter], [-radius,  top_offset,  2*radius], [ radius,  top_offset,  2*radius], [ radius, -total_height,  bottom_diameter],
-                    [-radius,  top_offset, -2*radius], [-radius, -total_height, -bottom_diameter], [ radius, -total_height, -bottom_diameter], [ radius,  top_offset, -2*radius],
-                    [ radius, -total_height, -bottom_diameter], [-radius, -total_height, -bottom_diameter], [-radius, -total_height,  bottom_diameter], [ radius, -total_height,  bottom_diameter],
-                    [-radius,  top_offset, -2*radius], [ radius,  top_offset, -2*radius], [ radius,  top_offset,  2*radius], [-radius,  top_offset,  2*radius],
-                    [-radius, -total_height,  bottom_diameter], [-radius, -total_height, -bottom_diameter], [-radius,  top_offset, -2*radius], [-radius,  top_offset,  2*radius],
-                    [ radius, -total_height, -bottom_diameter], [ radius, -total_height,  bottom_diameter], [ radius,  top_offset,  2*radius], [ radius,  top_offset, -2*radius]
+            else:  # "Horizontal" Orientation (rotate_90_degrees == True)
+                vertices = [  # 10 faces with 4 corners each - ORIGINAL VERTEX LIST RESTORED
+                    [-max_radius, -taper_length, radius], [-2 * radius, top_offset, radius], [2 * radius, top_offset, radius], [max_radius, -taper_length, radius],
+                    [-2 * radius, top_offset, -radius], [-max_radius, -taper_length, -radius], [max_radius, -taper_length, -radius], [2 * radius, top_offset, -radius],
+                    [-max_radius, -total_height, radius], [-max_radius, -taper_length, radius], [max_radius, -taper_length, radius], [max_radius, -total_height, radius],
+                    [-max_radius, -taper_length, -radius], [-max_radius, -total_height, -radius], [max_radius, -total_height, -radius], [max_radius, -taper_length, -radius],
+                    [max_radius, -total_height, -radius], [-max_radius, -total_height, -radius], [-max_radius, -total_height, radius], [max_radius, -total_height, radius],
+                    [-2 * radius, top_offset, -radius], [2 * radius, top_offset, -radius], [2 * radius, top_offset, radius], [-2 * radius, top_offset, radius],
+                    [-max_radius, -taper_length, radius], [-max_radius, -taper_length, -radius], [-2 * radius, top_offset, -radius], [-2 * radius, top_offset, radius],
+                    [max_radius, -taper_length, -radius], [max_radius, -taper_length, radius], [2 * radius, top_offset, radius], [2 * radius, top_offset, -radius],
+                    [-max_radius, -total_height, radius], [-max_radius, -total_height, -radius], [-max_radius, -taper_length, -radius], [-max_radius, -taper_length, radius],
+                    [max_radius, -total_height, -radius], [max_radius, -total_height, radius], [max_radius, -taper_length, radius], [max_radius, -taper_length, -radius]
                 ]
-            else:
-                vertices = [ # 6 faces with 4 corners each
-                    [-bottom_diameter, -total_height,  radius], [-2*radius,  top_offset,  radius], [ 2*radius,  top_offset,  radius], [ bottom_diameter, -total_height,  radius],
-                    [-2*radius,  top_offset, -radius], [-bottom_diameter, -total_height, -radius], [ bottom_diameter, -total_height, -radius], [ 2*radius,  top_offset, -radius],
-                    [ bottom_diameter, -total_height, -radius], [-bottom_diameter, -total_height, -radius], [-bottom_diameter, -total_height,  radius], [ bottom_diameter, -total_height,  radius],
-                    [-2*radius,  top_offset, -radius], [ 2*radius,  top_offset, -radius], [ 2*radius,  top_offset,  radius], [-2*radius,  top_offset,  radius],
-                    [-bottom_diameter, -total_height,  radius], [-bottom_diameter, -total_height, -radius], [-2*radius,  top_offset, -radius], [-2*radius,  top_offset,  radius],
-                    [ bottom_diameter, -total_height, -radius], [ bottom_diameter, -total_height,  radius], [ 2*radius,  top_offset,  radius], [ 2*radius,  top_offset, -radius]
-                ]        
+
+        else:  # Straight abutment (no taper)
+            vertices_per_segment = 24
+            if not rotate_90_degrees: # "Vertical" Orientation (rotate_90_degrees == False)
+                vertices = [  # 6 faces with 4 corners each - ORIGINAL VERTEX LIST RESTORED
+                    [-radius, -total_height, bottom_diameter], [-radius, top_offset, 2 * radius], [radius, top_offset, 2 * radius], [radius, -total_height, bottom_diameter],
+                    [-radius, top_offset, -2 * radius], [-radius, -total_height, -bottom_diameter], [radius, -total_height, -bottom_diameter], [radius, top_offset, -2 * radius],
+                    [radius, -total_height, -bottom_diameter], [-radius, -total_height, -bottom_diameter], [-radius, -total_height, bottom_diameter], [radius, -total_height, bottom_diameter],
+                    [-radius, top_offset, -2 * radius], [radius, top_offset, -2 * radius], [radius, top_offset, 2 * radius], [-radius, top_offset, 2 * radius],
+                    [-radius, -total_height, bottom_diameter], [-radius, -total_height, -bottom_diameter], [-radius, top_offset, -2 * radius], [-radius, top_offset, 2 * radius],
+                    [radius, -total_height, -bottom_diameter], [radius, -total_height, bottom_diameter], [radius, top_offset, 2 * radius], [radius, top_offset, -2 * radius]
+                ]
+            else:  # "Horizontal" Orientation (rotate_90_degrees == True)
+                vertices = [  # 6 faces with 4 corners each - ORIGINAL VERTEX LIST RESTORED
+                    [-bottom_diameter, -total_height, radius], [-2 * radius, top_offset, radius], [2 * radius, top_offset, radius], [bottom_diameter, -total_height, radius],
+                    [-2 * radius, top_offset, -radius], [-bottom_diameter, -total_height, -radius], [bottom_diameter, -total_height, -radius], [2 * radius, top_offset, -radius],
+                    [bottom_diameter, -total_height, -radius], [-bottom_diameter, -total_height, -radius], [-bottom_diameter, -total_height, radius], [bottom_diameter, -total_height, radius],
+                    [-2 * radius, top_offset, -radius], [2 * radius, top_offset, -radius], [2 * radius, top_offset, radius], [-2 * radius, top_offset, radius],
+                    [-bottom_diameter, -total_height, radius], [-bottom_diameter, -total_height, -radius], [-2 * radius, top_offset, -radius], [-2 * radius, top_offset, radius],
+                    [bottom_diameter, -total_height, -radius], [bottom_diameter, -total_height, radius], [2 * radius, top_offset, radius], [2 * radius, top_offset, -radius]
+                ]
+
         mesh.setVertices(numpy.asarray(vertices, dtype=numpy.float32))
 
         indices = []
-        for i in range(0, vertices_per_segment, 4): # All 6 quads (12 triangles)
-            indices.append([i, i+2, i+1])
-            indices.append([i, i+3, i+2])
+        for i in range(0, vertices_per_segment, 4):  # All quads (12 triangles - or 6 for straight)
+            indices.append([i, i + 2, i + 1])
+            indices.append([i, i + 3, i + 2])
         mesh.setIndices(numpy.asarray(indices, dtype=numpy.int32))
 
         mesh.calculateNormals()
         return mesh
         
     # Cylinder creation
-    def _createCylinder(self, diameter, max_diameter, cirlce_segments, length, top_additional_height, taper_angle):
+    def _createCylinder(self, diameter, minmax_diameter, circle_segments, length, top_additional_height, taper_angle):
         mesh = MeshBuilder()
         # Per-vertex normals require duplication of vertices
         radius = diameter / 2
-        max_radius = max_diameter / 2
+        minmax_radius = minmax_diameter / 2
 
         negative_length = -length
-        num_segments = int(360 / cirlce_segments)
-        angle_increment_radius = math.radians(cirlce_segments)
-        bottom_outer_radius=math.tan(math.radians(taper_angle)) * length + radius
-        if max_radius>radius and taper_angle!=0 :
-            taper_length = (max_radius-radius) / math.tan(math.radians(taper_angle))
-        else :
+        num_segments = int(360 / circle_segments)
+        angle_increment_radians = math.radians(circle_segments)
+        
+        if taper_angle > 0:  # Tapering outwards
+            bottom_radius = math.tan(math.radians(taper_angle)) * length + radius
+            bottom_radius = min(bottom_radius, minmax_radius)
+            if minmax_radius > radius and taper_angle != 0: # minmax_radius is max_radius in this case
+                taper_length_calculated = (minmax_radius-radius) / math.tan(math.radians(taper_angle))
+                taper_length = min(taper_length_calculated, length) # **MODIFIED: Cap taper_length at 'length'**
+            else :
+                taper_length = negative_length
+
+        elif taper_angle < 0:  # Tapering inwards
+            taper_angle = abs(taper_angle)
+            bottom_radius = radius - math.tan(math.radians(taper_angle)) * length
+            bottom_radius = max(bottom_radius, minmax_radius) # minmax_radius is min_radius in this case, ensure bottom_radius doesn't go below min_radius
+            if radius > minmax_radius and taper_angle != 0: # Check if inward taper is actually possible/needed
+                 taper_length_calculated = (radius - minmax_radius) / math.tan(math.radians(taper_angle))
+                 taper_length = min(taper_length_calculated, length) # **MODIFIED: Cap taper_length at 'length'**
+            else:
+                taper_length = negative_length
+        else:  # If tapering is no longer cool
+            bottom_radius = radius
             taper_length = negative_length
             
-        #Logger.log('d', 'lg : ' + str(lg))
-        #Logger.log('d', 'l_max : ' + str(l_max)) 
+
+        log('d', f'taper_length: {taper_length}')
+        log('d', f'length: {length}')
+        log('d', f'Condition (taper_length < length and taper_length > 0): {taper_length < length and taper_length > 0}')
+
         
         vertices = []
-        if taper_length < length and taper_length > 0:
-            vertices_per_segment = 18  # This magic number is originally 18
-            for i in range(0, num_segments):
-                # Top
+        if taper_length <= length and taper_length > 0:
+            num_segments = int(360 / circle_segments)
+            angle_increment_radians = math.radians(circle_segments)
+
+            top_circle_vertices_taper = [] # Top circle vertices for TAPERED section
+            bottom_circle_vertices_taper = [] # Bottom circle vertices for TAPERED section
+            bottom_circle_vertices_straight = [] # Bottom circle vertices for STRAIGHT section (below taper)
+
+
+            # 1. Generate vertices for the top and bottom circles of the TAPERED SECTION (SHARED vertices)
+            for i in range(num_segments):
+                angle = i * angle_increment_radians
+                x_top = radius * math.cos(angle)
+                z_top = radius * math.sin(angle)
+                top_circle_vertices_taper.append([x_top, top_additional_height, z_top])
+
+                x_bottom_taper = minmax_radius * math.cos(angle) # Using minmax_radius (max_radius for outward, min_radius for inward)
+                z_bottom_taper = minmax_radius * math.sin(angle) # Using minmax_radius
+                bottom_circle_vertices_taper.append([x_bottom_taper, -taper_length, z_bottom_taper])
+
+
+            # 2. Generate vertices for the bottom circle of the STRAIGHT SECTION (SHARED vertices)
+            for i in range(num_segments):
+                angle = i * angle_increment_radians
+                x_bottom_straight = minmax_radius * math.cos(angle) # Radius is now minmax_radius for straight section
+                z_bottom_straight = minmax_radius * math.sin(angle) # Radius is minmax_radius
+                bottom_circle_vertices_straight.append([x_bottom_straight, negative_length, z_bottom_straight])
+
+
+            vertices = [] # Clear vertices list
+
+            for i in range(num_segments):
+                v_index_current = i
+                v_index_next = (i + 1) % num_segments
+
+                # Top Cap (same as before, using vertices of top circle of tapered section)
                 vertices.append([0, top_additional_height, 0])
-                vertices.append([radius*math.cos((i+1)*angle_increment_radius), top_additional_height, radius*math.sin((i+1)*angle_increment_radius)])
-                vertices.append([radius*math.cos(i*angle_increment_radius), top_additional_height, radius*math.sin(i*angle_increment_radius)])
-                #Side 1a
-                vertices.append([radius*math.cos(i*angle_increment_radius), top_additional_height, radius*math.sin(i*angle_increment_radius)])
-                vertices.append([radius*math.cos((i+1)*angle_increment_radius), top_additional_height, radius*math.sin((i+1)*angle_increment_radius)])
-                vertices.append([max_radius*math.cos((i+1)*angle_increment_radius), -taper_length, max_radius*math.sin((i+1)*angle_increment_radius)])
-                #Side 1b
-                vertices.append([max_radius*math.cos((i+1)*angle_increment_radius), -taper_length, max_radius*math.sin((i+1)*angle_increment_radius)])
-                vertices.append([max_radius*math.cos(i*angle_increment_radius), -taper_length, max_radius*math.sin(i*angle_increment_radius)])
-                vertices.append([radius*math.cos(i*angle_increment_radius), top_additional_height, radius*math.sin(i*angle_increment_radius)])
-                #Side 2a
-                vertices.append([max_radius*math.cos(i*angle_increment_radius), -taper_length, max_radius*math.sin(i*angle_increment_radius)])
-                vertices.append([max_radius*math.cos((i+1)*angle_increment_radius), -taper_length, max_radius*math.sin((i+1)*angle_increment_radius)])
-                vertices.append([max_radius*math.cos((i+1)*angle_increment_radius), negative_length, max_radius*math.sin((i+1)*angle_increment_radius)])
-                #Side 2b
-                vertices.append([max_radius*math.cos((i+1)*angle_increment_radius), negative_length, max_radius*math.sin((i+1)*angle_increment_radius)])
-                vertices.append([max_radius*math.cos(i*angle_increment_radius), negative_length, max_radius*math.sin(i*angle_increment_radius)])
-                vertices.append([max_radius*math.cos(i*angle_increment_radius), -taper_length, max_radius*math.sin(i*angle_increment_radius)])
-                #Bottom 
+                vertices.append(top_circle_vertices_taper[v_index_next])
+                vertices.append(top_circle_vertices_taper[v_index_current])
+
+                # Side 1a (TAPERED SECTION - using SHARED vertices for tapered part)
+                vertices.append(top_circle_vertices_taper[v_index_current])      # Top-Left
+                vertices.append(top_circle_vertices_taper[v_index_next])      # Top-Right
+                vertices.append(bottom_circle_vertices_taper[v_index_next])   # Bottom-Right (of TAPERED section)
+
+                # Side 1b (TAPERED SECTION - using SHARED vertices for tapered part)
+                vertices.append(bottom_circle_vertices_taper[v_index_next])   # Bottom-Right (of TAPERED section)
+                vertices.append(bottom_circle_vertices_taper[v_index_current])  # Bottom-Left (of TAPERED section)
+                vertices.append(top_circle_vertices_taper[v_index_current])      # Top-Left
+
+                # Side 2a (STRAIGHT SECTION - using SHARED vertices for straight part)
+                vertices.append(bottom_circle_vertices_taper[v_index_current])   # Top-Left  (which is BOTTOM of tapered section)
+                vertices.append(bottom_circle_vertices_taper[v_index_next])   # Top-Right  (which is BOTTOM of tapered section)
+                vertices.append(bottom_circle_vertices_straight[v_index_next]) # Bottom-Right (of STRAIGHT section)
+
+                # Side 2b (STRAIGHT SECTION - using SHARED vertices for straight part)
+                vertices.append(bottom_circle_vertices_straight[v_index_next]) # Bottom-Right (of STRAIGHT section)
+                vertices.append(bottom_circle_vertices_straight[v_index_current])# Bottom-Left  (of STRAIGHT section)
+                vertices.append(bottom_circle_vertices_taper[v_index_current])   # Top-Left  (which is BOTTOM of tapered section)
+
+
+                # Bottom Cap (using vertices of bottom circle of straight section)
                 vertices.append([0, negative_length, 0])
-                vertices.append([max_radius*math.cos(i*angle_increment_radius), negative_length, max_radius*math.sin(i*angle_increment_radius)])
-                vertices.append([max_radius*math.cos((i+1)*angle_increment_radius), negative_length, max_radius*math.sin((i+1)*angle_increment_radius)]) 
-                
-        else:
-            vertices_per_segment=12  # This magic number is originally 12
-            for i in range(0, num_segments):
-                # Top
-                vertices.append([0, top_additional_height, 0])
-                vertices.append([radius*math.cos((i+1)*angle_increment_radius), top_additional_height, radius*math.sin((i+1)*angle_increment_radius)])
-                vertices.append([radius*math.cos(i*angle_increment_radius), top_additional_height, radius*math.sin(i*angle_increment_radius)])
-                #Side 1a
-                vertices.append([radius*math.cos(i*angle_increment_radius), top_additional_height, radius*math.sin(i*angle_increment_radius)])
-                vertices.append([radius*math.cos((i+1)*angle_increment_radius), top_additional_height, radius*math.sin((i+1)*angle_increment_radius)])
-                vertices.append([bottom_outer_radius*math.cos((i+1)*angle_increment_radius), negative_length, bottom_outer_radius*math.sin((i+1)*angle_increment_radius)])
-                #Side 1b
-                vertices.append([bottom_outer_radius*math.cos((i+1)*angle_increment_radius), negative_length, bottom_outer_radius*math.sin((i+1)*angle_increment_radius)])
-                vertices.append([bottom_outer_radius*math.cos(i*angle_increment_radius), negative_length, bottom_outer_radius*math.sin(i*angle_increment_radius)])
-                vertices.append([radius*math.cos(i*angle_increment_radius), top_additional_height, radius*math.sin(i*angle_increment_radius)])
-                #Bottom 
-                vertices.append([0, negative_length, 0])
-                vertices.append([bottom_outer_radius*math.cos(i*angle_increment_radius), negative_length, bottom_outer_radius*math.sin(i*angle_increment_radius)])
-                vertices.append([bottom_outer_radius*math.cos((i+1)*angle_increment_radius), negative_length, bottom_outer_radius*math.sin((i+1)*angle_increment_radius)])
+                vertices.append(bottom_circle_vertices_straight[v_index_current])
+                vertices.append(bottom_circle_vertices_straight[v_index_next])
+
+        else: # STRAIGHT CYLINDER CASE - Using Shared Vertices
+            num_segments = int(360 / circle_segments)
+            angle_increment_radians = math.radians(circle_segments)
+
+            bottom_radius = radius
+            
+            top_circle_vertices = [] # List to store vertices of the top circle
+            bottom_circle_vertices = [] # List to store vertices of the bottom circle
+
+            # 1. Generate vertices for the top and bottom circles (SHARED vertices)
+            for i in range(num_segments):
+                angle = i * angle_increment_radians
+                x = radius * math.cos(angle)
+                z = radius * math.sin(angle)
+                top_circle_vertices.append([x, top_additional_height, z])
+                bottom_circle_vertices.append([x, negative_length, z])
+
+            vertices = [] # Clear the vertices list
+
+            for i in range(num_segments):
+                # Get vertex indices for this segment, wrapping around for the last segment
+                v_index_current = i
+                v_index_next = (i + 1) % num_segments # Wrap around to 0 for the last segment
+
+                # Top Triangle
+                vertices.append([0, top_additional_height, 0]) # Center of top
+                vertices.append(top_circle_vertices[v_index_next]) # Vertex on top circle (next)
+                vertices.append(top_circle_vertices[v_index_current]) # Vertex on top circle (current)
+
+                # Side 1a (using SHARED vertices from top and bottom circles)
+                vertices.append(top_circle_vertices[v_index_current])     # Top-Left  (vertex i on top circle)
+                vertices.append(top_circle_vertices[v_index_next])     # Top-Right (vertex i+1 on top circle)
+                vertices.append(bottom_circle_vertices[v_index_next])  # Bottom-Right (vertex i+1 on bottom circle)
+
+                # Side 1b (using SHARED vertices from top and bottom circles)
+                vertices.append(bottom_circle_vertices[v_index_next])  # Bottom-Right (vertex i+1 on bottom circle)
+                vertices.append(bottom_circle_vertices[v_index_current]) # Bottom-Left  (vertex i on bottom circle)
+                vertices.append(top_circle_vertices[v_index_current])     # Top-Left  (vertex i on top circle)
+
+                # Bottom Triangle
+                vertices.append([0, negative_length, 0]) # Center of bottom
+                vertices.append(bottom_circle_vertices[v_index_current]) # Vertex on bottom circle (current)
+                vertices.append(bottom_circle_vertices[v_index_next]) # Vertex on bottom circle (next)
         
         mesh.setVertices(numpy.asarray(vertices, dtype=numpy.float32))
 
         indices = []
-        # for every angle increment nbv (12 or 18) Vertices
-        total_vertices = num_segments * vertices_per_segment
-        for i in range(0, total_vertices, 3): # 
+        for i in range(0, len(vertices), 3):
             indices.append([i, i+1, i+2])
         mesh.setIndices(numpy.asarray(indices, dtype=numpy.int32))
 
@@ -938,122 +1142,221 @@ class CustomSupportsReborn(Tool):
         return mesh
  
    # Tube creation
-    def _createTube(self, outer_diameter, max_diameter, inner_diameter, circle_segments, length, top_additional_height, taper_angle):
+    def _createTube(self, outer_diameter, minmax_diameter, wall_width, circle_segments, length, top_additional_height, taper_angle):
         # Logger.log('d', 'isize : ' + str(isize)) 
         mesh = MeshBuilder()
-        # Per-vertex normals require duplication of vertices
         outer_radius = outer_diameter / 2
-        inner_radius = inner_diameter / 2
-        max_radius = max_diameter / 2
+        minmax_outer_radius = minmax_diameter / 2
+        inner_radius = outer_radius - wall_width  # Calculate inner radius based on wall_width
+        inner_radius = max(0, inner_radius) # Clamp inner_radius to be at least 0 - PREVENT HOURGLASS
+
         negative_length = -length
         num_segments = int(360 / circle_segments)
         angle_increment_radians = math.radians(circle_segments)
-        bottom_outer_radius = math.tan(math.radians(taper_angle)) * length + outer_radius  # How wide it will be at the bottom
-        # Length of the tapered section
-        if max_radius > outer_radius and taper_angle != 0:
-            taper_length= (max_radius-outer_radius) / math.tan(math.radians(taper_angle))
-        else :
+
+        if taper_angle > 0:  # Tapering outwards
+            bottom_outer_radius = math.tan(math.radians(taper_angle)) * length + outer_radius
+            bottom_outer_radius = min(bottom_outer_radius, minmax_outer_radius)
+            bottom_inner_radius = bottom_outer_radius - wall_width # Inner radius also tapers outwards, maintaining wall_width
+            if minmax_outer_radius > outer_radius and taper_angle != 0:
+                taper_length = (minmax_outer_radius - outer_radius) / math.tan(math.radians(taper_angle))
+                taper_length = min(taper_length, length)
+            else:
+                taper_length = negative_length
+
+        elif taper_angle < 0:  # Tapering inwards
+            taper_angle = abs(taper_angle)
+            bottom_outer_radius = outer_radius - math.tan(math.radians(taper_angle)) * length
+            bottom_outer_radius = max(bottom_outer_radius, minmax_outer_radius)
+            bottom_inner_radius = bottom_outer_radius - wall_width # Inner radius also tapers inwards, maintaining wall_width
+            if outer_radius > minmax_outer_radius and taper_angle != 0:
+                taper_length = (outer_radius - minmax_outer_radius) / math.tan(math.radians(taper_angle))
+                taper_length = min(taper_length, length)
+            else:
+                taper_length = negative_length
+        else:  # No taper
+            bottom_outer_radius = outer_radius
+            bottom_inner_radius = inner_radius
             taper_length = negative_length
             
         vertices = []
-        if taper_length < length and taper_length > 0:
-            vertices_per_segment=30  # This magic number is originally 30
-            for i in range(0, num_segments):
-                # Top
-                vertices.append([inner_radius*math.cos(i*angle_increment_radians), top_additional_height, inner_radius*math.sin(i*angle_increment_radians)])
-                vertices.append([outer_radius*math.cos((i+1)*angle_increment_radians), top_additional_height, outer_radius*math.sin((i+1)*angle_increment_radians)])
-                vertices.append([outer_radius*math.cos(i*angle_increment_radians), top_additional_height, outer_radius*math.sin(i*angle_increment_radians)])
-                
-                vertices.append([inner_radius*math.cos((i+1)*angle_increment_radians), top_additional_height, inner_radius*math.sin((i+1)*angle_increment_radians)])
-                vertices.append([outer_radius*math.cos((i+1)*angle_increment_radians), top_additional_height, outer_radius*math.sin((i+1)*angle_increment_radians)])
-                vertices.append([inner_radius*math.cos(i*angle_increment_radians), top_additional_height, inner_radius*math.sin(i*angle_increment_radians)])
+        if taper_length <= length and taper_length > 0:
+            outer_top_vertices_taper = [] # Top circle vertices for TAPERED section
+            outer_bottom_vertices_taper = [] # Bottom circle vertices for TAPERED section
+            inner_top_vertices_taper = [] # Top inner circle vertices for TAPERED section
+            inner_bottom_vertices_taper = [] # Bottom inner circle vertices for TAPERED section
+            outer_bottom_vertices_straight = [] # Bottom circle vertices for STRAIGHT section (below taper)
+            inner_bottom_vertices_straight = [] # Bottom inner circle vertices for STRAIGHT section (below taper)ottom inner circle vertices for STRAIGHT section (below taper)
 
-                #Side 1a
-                vertices.append([outer_radius*math.cos(i*angle_increment_radians), top_additional_height, outer_radius*math.sin(i*angle_increment_radians)])
-                vertices.append([outer_radius*math.cos((i+1)*angle_increment_radians), top_additional_height, outer_radius*math.sin((i+1)*angle_increment_radians)])
-                vertices.append([max_radius*math.cos((i+1)*angle_increment_radians), -taper_length, max_radius*math.sin((i+1)*angle_increment_radians)])
-                
-                #Side 1b
-                vertices.append([max_radius*math.cos((i+1)*angle_increment_radians), -taper_length, max_radius*math.sin((i+1)*angle_increment_radians)])
-                vertices.append([max_radius*math.cos(i*angle_increment_radians), -taper_length, max_radius*math.sin(i*angle_increment_radians)])
-                vertices.append([outer_radius*math.cos(i*angle_increment_radians), top_additional_height, outer_radius*math.sin(i*angle_increment_radians)])
-                
-                #Side 2a
-                vertices.append([max_radius*math.cos(i*angle_increment_radians), -taper_length, max_radius*math.sin(i*angle_increment_radians)])
-                vertices.append([max_radius*math.cos((i+1)*angle_increment_radians), -taper_length, max_radius*math.sin((i+1)*angle_increment_radians)])
-                vertices.append([max_radius*math.cos((i+1)*angle_increment_radians), negative_length, max_radius*math.sin((i+1)*angle_increment_radians)])
-                
-                #Side 2b
-                vertices.append([max_radius*math.cos((i+1)*angle_increment_radians), negative_length, max_radius*math.sin((i+1)*angle_increment_radians)])
-                vertices.append([max_radius*math.cos(i*angle_increment_radians), negative_length, max_radius*math.sin(i*angle_increment_radians)])
-                vertices.append([max_radius*math.cos(i*angle_increment_radians), -taper_length, max_radius*math.sin(i*angle_increment_radians)])
-                
-                #Bottom 
-                vertices.append([inner_radius*math.cos(i*angle_increment_radians), negative_length, inner_radius*math.sin(i*angle_increment_radians)])
-                vertices.append([max_radius*math.cos(i*angle_increment_radians), negative_length, max_radius*math.sin(i*angle_increment_radians)])
-                vertices.append([max_radius*math.cos((i+1)*angle_increment_radians), negative_length, max_radius*math.sin((i+1)*angle_increment_radians)]) 
-                
-                vertices.append([inner_radius*math.cos((i+1)*angle_increment_radians), negative_length, inner_radius*math.sin((i+1)*angle_increment_radians)])
-                vertices.append([inner_radius*math.cos(i*angle_increment_radians), negative_length, inner_radius*math.sin(i*angle_increment_radians)])
-                vertices.append([max_radius*math.cos((i+1)*angle_increment_radians), negative_length, max_radius*math.sin((i+1)*angle_increment_radians)]) 
-                
-                #Side Inta
-                vertices.append([inner_radius*math.cos(i*angle_increment_radians), top_additional_height, inner_radius*math.sin(i*angle_increment_radians)])
-                vertices.append([inner_radius*math.cos((i+1)*angle_increment_radians), negative_length, inner_radius*math.sin((i+1)*angle_increment_radians)])
-                vertices.append([inner_radius*math.cos((i+1)*angle_increment_radians), top_additional_height, inner_radius*math.sin((i+1)*angle_increment_radians)])
-                
-                #Side Intb
-                vertices.append([inner_radius*math.cos((i+1)*angle_increment_radians), negative_length, inner_radius*math.sin((i+1)*angle_increment_radians)])
-                vertices.append([inner_radius*math.cos(i*angle_increment_radians), top_additional_height, inner_radius*math.sin(i*angle_increment_radians)])
-                vertices.append([inner_radius*math.cos(i*angle_increment_radians), negative_length, inner_radius*math.sin(i*angle_increment_radians)])
+            taper_negative_length = -taper_length # Define negative taper length
+
+            for i in range(num_segments):
+                angle = i * angle_increment_radians
+                x_top = outer_radius * math.cos(angle)
+                z_top = outer_radius * math.sin(angle)
+                outer_top_vertices_taper.append([x_top, top_additional_height, z_top]) # Top outer vertices of TAPERED section
+                inner_top_vertices_taper.append([x_top * (inner_radius / outer_radius), top_additional_height, z_top * (inner_radius / outer_radius)]) # Top inner vertices of TAPERED section
+
+                x_bottom_taper = bottom_outer_radius * math.cos(angle) # X,Z for bottom of tapered section
+                z_bottom_taper = bottom_outer_radius * math.sin(angle) # X,Z for bottom of tapered section
+                outer_bottom_vertices_taper.append([x_bottom_taper, taper_negative_length, z_bottom_taper]) # Bottom outer vertices of TAPERED section
+                inner_bottom_vertices_taper.append([x_bottom_taper * (bottom_inner_radius / bottom_outer_radius), taper_negative_length, z_bottom_taper * (bottom_inner_radius / bottom_outer_radius)]) # Bottom inner vertices of TAPERED section
+
+
+                x_bottom_straight = bottom_outer_radius * math.cos(angle) # Radius is constant for straight section
+                z_bottom_straight = bottom_outer_radius * math.sin(angle) # Radius is constant for straight section
+                outer_bottom_vertices_straight.append([x_bottom_straight, negative_length, z_bottom_straight]) # Bottom outer vertices of STRAIGHT section
+                inner_bottom_vertices_straight.append([x_bottom_straight * (bottom_inner_radius / bottom_outer_radius), negative_length, z_bottom_straight * (bottom_inner_radius / bottom_outer_radius)]) # Bottom inner vertices of STRAIGHT section
+
+
+            vertices = [] # Clear vertices list
+            indices = []
+
+            for i in range(num_segments):
+                v_index_current = i
+                v_index_next = (i + 1) % num_segments
+
+                # --- Top Cap Ring (Tapered Section Top) ---
+                # Triangle 1 (Top Cap Ring)
+                vertices.append(inner_top_vertices_taper[v_index_current])
+                vertices.append(outer_top_vertices_taper[v_index_next])
+                vertices.append(outer_top_vertices_taper[v_index_current])
+                # Triangle 2 (Top Cap Ring)
+                vertices.append(inner_top_vertices_taper[v_index_next])
+                vertices.append(outer_top_vertices_taper[v_index_next])
+                vertices.append(inner_top_vertices_taper[v_index_current])
+
+
+                # --- Outer Side Faces (TAPERED SECTION) ---
+                # Side 1a (Outer Tapered)
+                vertices.append(outer_top_vertices_taper[v_index_current])
+                vertices.append(outer_top_vertices_taper[v_index_next])
+                vertices.append(outer_bottom_vertices_taper[v_index_next])
+                # Side 1b (Outer Tapered)
+                vertices.append(outer_bottom_vertices_taper[v_index_next])
+                vertices.append(outer_bottom_vertices_taper[v_index_current])
+                vertices.append(outer_top_vertices_taper[v_index_current])
+
+
+                # --- Inner Side Faces (TAPERED SECTION) ---
+                # Side 2a (Inner Tapered)
+                vertices.append(inner_top_vertices_taper[v_index_current])
+                vertices.append(inner_bottom_vertices_taper[v_index_next])
+                vertices.append(inner_top_vertices_taper[v_index_next])
+                # Side 2b (Inner Tapered)
+                vertices.append(inner_bottom_vertices_taper[v_index_next])
+                vertices.append(inner_bottom_vertices_taper[v_index_current])
+                vertices.append(inner_top_vertices_taper[v_index_current])
+
+
+                # --- Outer Side Faces (STRAIGHT SECTION - below taper) ---
+                # Side 3a (Outer Straight)
+                vertices.append(outer_bottom_vertices_taper[v_index_current]) # Top of straight section
+                vertices.append(outer_bottom_vertices_taper[v_index_next]) # Top of straight section
+                vertices.append(outer_bottom_vertices_straight[v_index_next]) # Bottom of straight section
+                # Side 3b (Outer Straight)
+                vertices.append(outer_bottom_vertices_straight[v_index_next]) # Bottom of straight section
+                vertices.append(outer_bottom_vertices_straight[v_index_current])# Bottom of straight section
+                vertices.append(outer_bottom_vertices_taper[v_index_current]) # Top of straight section
+
+
+                # --- Inner Side Faces (STRAIGHT SECTION - below taper) ---
+                # Side 4a (Inner Straight)
+                vertices.append(inner_bottom_vertices_taper[v_index_current]) # Top of straight section
+                vertices.append(inner_bottom_vertices_straight[v_index_next]) # Bottom of straight section
+                vertices.append(inner_bottom_vertices_taper[v_index_next]) # Top of straight section
+                # Side 4b (Inner Straight)
+                vertices.append(inner_bottom_vertices_straight[v_index_next]) # Bottom of straight section
+                vertices.append(inner_bottom_vertices_straight[v_index_current])# Bottom of straight section
+                vertices.append(inner_bottom_vertices_taper[v_index_current]) # Top of straight section
+
+
+                # --- Bottom Cap Ring (Straight Section Bottom) ---
+                # Triangle 1 (Bottom Cap Ring)
+                vertices.append(inner_bottom_vertices_straight[v_index_current])
+                vertices.append(outer_bottom_vertices_straight[v_index_current])
+                vertices.append(outer_bottom_vertices_straight[v_index_next])
+                # Triangle 2 (Bottom Cap Ring)
+                vertices.append(inner_bottom_vertices_straight[v_index_next])
+                vertices.append(outer_bottom_vertices_straight[v_index_next])
+                vertices.append(inner_bottom_vertices_straight[v_index_current])
                 
         else:
-            vertices_per_segment=24  # This magic number is originally 24
-            for i in range(0, num_segments):
-                # Top
-                vertices.append([inner_radius*math.cos(i*angle_increment_radians), top_additional_height, inner_radius*math.sin(i*angle_increment_radians)])
-                vertices.append([outer_radius*math.cos((i+1)*angle_increment_radians), top_additional_height, outer_radius*math.sin((i+1)*angle_increment_radians)])
-                vertices.append([outer_radius*math.cos(i*angle_increment_radians), top_additional_height, outer_radius*math.sin(i*angle_increment_radians)])
-                
-                vertices.append([inner_radius*math.cos((i+1)*angle_increment_radians), top_additional_height, inner_radius*math.sin((i+1)*angle_increment_radians)])
-                vertices.append([outer_radius*math.cos((i+1)*angle_increment_radians), top_additional_height, outer_radius*math.sin((i+1)*angle_increment_radians)])
-                vertices.append([inner_radius*math.cos(i*angle_increment_radians), top_additional_height, inner_radius*math.sin(i*angle_increment_radians)])
-                
-                #Side 1a
-                vertices.append([outer_radius*math.cos(i*angle_increment_radians), top_additional_height, outer_radius*math.sin(i*angle_increment_radians)])
-                vertices.append([outer_radius*math.cos((i+1)*angle_increment_radians), top_additional_height, outer_radius*math.sin((i+1)*angle_increment_radians)])
-                vertices.append([bottom_outer_radius*math.cos((i+1)*angle_increment_radians), negative_length, bottom_outer_radius*math.sin((i+1)*angle_increment_radians)])
-                
-                #Side 1b
-                vertices.append([bottom_outer_radius*math.cos((i+1)*angle_increment_radians), negative_length, bottom_outer_radius*math.sin((i+1)*angle_increment_radians)])
-                vertices.append([bottom_outer_radius*math.cos(i*angle_increment_radians), negative_length, bottom_outer_radius*math.sin(i*angle_increment_radians)])
-                vertices.append([outer_radius*math.cos(i*angle_increment_radians), top_additional_height, outer_radius*math.sin(i*angle_increment_radians)])
-                
-                #Bottom 
-                vertices.append([inner_radius*math.cos(i*angle_increment_radians), negative_length, inner_radius*math.sin(i*angle_increment_radians)])
-                vertices.append([bottom_outer_radius*math.cos(i*angle_increment_radians), negative_length, bottom_outer_radius*math.sin(i*angle_increment_radians)])
-                vertices.append([bottom_outer_radius*math.cos((i+1)*angle_increment_radians), negative_length, bottom_outer_radius*math.sin((i+1)*angle_increment_radians)]) 
-                
-                vertices.append([inner_radius*math.cos((i+1)*angle_increment_radians), negative_length, inner_radius*math.sin((i+1)*angle_increment_radians)])
-                vertices.append([inner_radius*math.cos(i*angle_increment_radians), negative_length, inner_radius*math.sin(i*angle_increment_radians)])
-                vertices.append([bottom_outer_radius*math.cos((i+1)*angle_increment_radians), negative_length, bottom_outer_radius*math.sin((i+1)*angle_increment_radians)]) 
-                
-                #Side Inta
-                vertices.append([inner_radius*math.cos(i*angle_increment_radians), top_additional_height, inner_radius*math.sin(i*angle_increment_radians)])
-                vertices.append([inner_radius*math.cos((i+1)*angle_increment_radians), negative_length, inner_radius*math.sin((i+1)*angle_increment_radians)])
-                vertices.append([inner_radius*math.cos((i+1)*angle_increment_radians), top_additional_height, inner_radius*math.sin((i+1)*angle_increment_radians)])
-                
-                #Side Intb
-                vertices.append([inner_radius*math.cos((i+1)*angle_increment_radians), negative_length, inner_radius*math.sin((i+1)*angle_increment_radians)])
-                vertices.append([inner_radius*math.cos(i*angle_increment_radians), top_additional_height, inner_radius*math.sin(i*angle_increment_radians)])
-                vertices.append([inner_radius*math.cos(i*angle_increment_radians), negative_length, inner_radius*math.sin(i*angle_increment_radians)])
+            outer_top_vertices = []   # Array for top outer circle vertices
+            outer_bottom_vertices = []  # Array for bottom outer circle vertices
+            inner_top_vertices = []   # Array for top inner circle vertices
+            inner_bottom_vertices = []  # Array for bottom inner circle vertices
+
+            for i in range(num_segments):
+                angle = i * angle_increment_radians
+                x = outer_radius * math.cos(angle)  # Calculate X and Z based on outer radius
+                z = outer_radius * math.sin(angle)
+
+                # Top Outer Circle Vertices (using shared X, Z and outer_radius)
+                outer_top_vertices.append([x, top_additional_height, z])
+                # Bottom Outer Circle Vertices (using shared X, Z and bottom_outer_radius)
+                outer_bottom_vertices.append([x * (bottom_outer_radius / outer_radius) , negative_length, z * (bottom_outer_radius / outer_radius)]) # Scale X and Z for bottom_outer_radius
+                # Top Inner Circle Vertices (using shared X, Z and inner_radius)
+                inner_top_vertices.append([x * (inner_radius / outer_radius), top_additional_height, z * (inner_radius / outer_radius)]) # Scale X and Z for inner_radius
+                # Bottom Inner Circle Vertices (using shared X, Z and bottom_inner_radius)
+                inner_bottom_vertices.append([x * (bottom_inner_radius / outer_radius), negative_length, z * (bottom_inner_radius / outer_radius)]) # Scale X and Z for bottom_inner_radius and bottom_outer_radius
+
+            vertices = []
+            for i in range(num_segments):
+                # Get vertex indices for this segment, wrapping around
+                v_index_current = i
+                v_index_next = (i + 1) % num_segments
+
+                # --- Outer Side Faces ---
+                # Side 1a (Outer)
+                vertices.append(outer_top_vertices[v_index_current])
+                vertices.append(outer_top_vertices[v_index_next])
+                vertices.append(outer_bottom_vertices[v_index_next])
+
+                # Side 1b (Outer)
+                vertices.append(outer_bottom_vertices[v_index_next])
+                vertices.append(outer_bottom_vertices[v_index_current])
+                vertices.append(outer_top_vertices[v_index_current])
+
+                # --- Inner Side Faces ---
+                # Side 2a (Inner) - Note reversed vertex order for inward facing
+                vertices.append(inner_top_vertices[v_index_current])
+                vertices.append(inner_bottom_vertices[v_index_next])
+                vertices.append(inner_top_vertices[v_index_next])
+
+                # Side 2b (Inner) - Note reversed vertex order for inward facing
+                vertices.append(inner_bottom_vertices[v_index_next])
+                vertices.append(inner_bottom_vertices[v_index_current])
+                vertices.append(inner_top_vertices[v_index_current])
+
+                # --- Top Cap Ring (Connecting outer and inner top circles) ---
+                # Triangle 1 (Top Cap Ring)
+                vertices.append(inner_top_vertices[v_index_current])
+                vertices.append(outer_top_vertices[v_index_next])
+                vertices.append(outer_top_vertices[v_index_current])
+
+                # Triangle 2 (Top Cap Ring)
+                vertices.append(inner_top_vertices[v_index_next])
+                vertices.append(outer_top_vertices[v_index_next])
+                vertices.append(inner_top_vertices[v_index_current])
+
+
+                # --- Bottom Cap Ring (Connecting outer and inner bottom circles) ---
+                # Triangle 1 (Bottom Cap Ring)
+                vertices.append(inner_bottom_vertices[v_index_current])
+                vertices.append(outer_bottom_vertices[v_index_current])
+                vertices.append(outer_bottom_vertices[v_index_next])
+
+                # Triangle 2 (Bottom Cap Ring)
+                vertices.append(inner_bottom_vertices[v_index_next])
+                vertices.append(outer_bottom_vertices[v_index_next])
+                vertices.append(inner_bottom_vertices[v_index_current])
+
 
         mesh.setVertices(numpy.asarray(vertices, dtype=numpy.float32))
 
-        indices = []
-        # for every angle increment ( 24  or 30 ) Vertices
-        total_vertices = num_segments * vertices_per_segment
-        for i in range(0, total_vertices, 3): # 
+        indices = [] # Generate indices based on vertex order (simple sequential indexing)
+        for i in range(0, len(vertices), 3):
             indices.append([i, i+1, i+2])
         mesh.setIndices(numpy.asarray(indices, dtype=numpy.int32))
 
@@ -1061,30 +1364,55 @@ class CustomSupportsReborn(Tool):
         return mesh
         
     # Line Support Creation
-    def _createLine(self, diameter, max_diameter, start_position , end_position, taper_angle, top_z):
+    def _createLine(self, top_diameter, minmax_diameter, start_position , end_position, taper_angle, top_offset):
         mesh = MeshBuilder()
-        # Init point
+
         start_point = Vector(start_position.x,start_position.z,start_position.y)
         end_point = Vector(end_position.x,end_position.z,end_position.y)
 
         line_direction = end_point - start_point
 
-        # Calcul vecteur
-        radius = diameter / 2
-        max_radius = max_diameter / 2
+        # Calculate vector
+        radius = top_diameter / 2
+        minmax_radius = minmax_diameter / 2
         start_height = start_position.y 
-        start_bottom_radius=math.tan(math.radians(taper_angle))*start_height+radius
         end_height = end_position.y 
-        end_bottom_radius=math.tan(math.radians(taper_angle))*end_height+radius
+
+        taper_angle_rad = math.radians(taper_angle) # Convert to radians once
+
+        if taper_angle > 0: # Outward Taper - Existing logic (mostly)
+            start_bottom_radius = math.tan(taper_angle_rad) * start_height + radius
+            end_bottom_radius = math.tan(taper_angle_rad) * end_height + radius
+        elif taper_angle < 0: # Inward Taper - Modified logic to handle negative angle
+            taper_amount_start = abs(math.tan(taper_angle_rad)) * start_height # Absolute taper amount
+            taper_amount_end = abs(math.tan(taper_angle_rad)) * end_height   # Absolute taper amount
+            start_bottom_radius = radius - taper_amount_start  # Subtract taper for inward
+            end_bottom_radius = radius - taper_amount_end    # Subtract taper for inward
+            start_bottom_radius = max(minmax_radius, start_bottom_radius) # Clamp to minmax_radius (bottom_width/2)
+            end_bottom_radius = max(minmax_radius, end_bottom_radius)     # Clamp to minmax_radius (bottom_width/2)
+        else: # Straight taper - unchanged
+            start_bottom_radius = radius
+            end_bottom_radius = radius
  
-        if max_radius > radius and taper_angle != 0:
-            start_taper_length = (max_radius - radius) / math.tan(math.radians(taper_angle))
-            end_taper_length = (max_radius - radius) / math.tan(math.radians(taper_angle))
-        else :
-            start_taper_length=start_height
-            end_taper_length=end_height
+        if taper_angle > 0: # Outward Taper - Existing logic (mostly)
+            if minmax_radius > radius and taper_angle != 0: # Existing condition
+                start_taper_length = (minmax_radius - radius) / math.tan(math.radians(taper_angle))
+                end_taper_length = (minmax_radius - radius) / math.tan(math.radians(taper_angle))
+            else:
+                start_taper_length = start_height
+                end_taper_length = end_height
+        elif taper_angle < 0: # Inward Taper - NEW taper_length calculation
+            if radius > minmax_radius and taper_angle != 0: # New condition for inward taper
+                start_taper_length = (radius - minmax_radius) / abs(math.tan(math.radians(taper_angle))) # Using ABS angle and reversed radius order
+                end_taper_length = (radius - minmax_radius) / abs(math.tan(math.radians(taper_angle)))   # Using ABS angle and reversed radius order
+            else: # Angle too shallow to reach minmax_radius, or straight
+                start_taper_length = start_height # Full height taper
+                end_taper_length = end_height     # Full height taper
+        else: # Straight taper - unchanged
+            start_taper_length = start_height
+            end_taper_length = end_height
  
-        top_offset_vector = Vector(0,0,top_z)
+        top_offset_vector = Vector(0,0,top_offset)
         radius_vector = Vector(0,0,radius)
         start_height_vector = Vector(0,0,-start_height)
         end_height_vector = Vector(0,0,-end_height)
@@ -1095,8 +1423,8 @@ class CustomSupportsReborn(Tool):
         if start_taper_length < start_height and end_taper_length < end_height and start_taper_length > 0 and end_taper_length > 0: 
             vertices_per_segment=40
             
-            start_max_radius_offset = Vector(normal_vector.x*max_radius,normal_vector.y*max_radius,normal_vector.z*max_radius)
-            end_max_radius_offset = Vector(normal_vector.x*max_radius,normal_vector.y*max_radius,normal_vector.z*max_radius)
+            start_max_radius_offset = Vector(normal_vector.x*minmax_radius,normal_vector.y*minmax_radius,normal_vector.z*minmax_radius)
+            end_max_radius_offset = Vector(normal_vector.x*minmax_radius,normal_vector.y*minmax_radius,normal_vector.z*minmax_radius)
 
             start_max_taper_height_vector = Vector(0,0,-start_taper_length)
             end_max_taper_height_vector = Vector(0,0,-end_taper_length)
@@ -1116,7 +1444,7 @@ class CustomSupportsReborn(Tool):
             point_2_start_inner = start_height_vector-start_max_radius_offset
             point_3_end_inner = end_height_vector+line_direction+end_max_radius_offset
             point_4_end_inner = end_height_vector+line_direction-end_max_radius_offset
-             
+
             """
             1) Top
             2) Front
@@ -1158,7 +1486,7 @@ class CustomSupportsReborn(Tool):
             point_2_start_inner = start_height_vector-start_max_radius_offset
             point_3_end_inner = end_height_vector+line_direction+end_max_radius_offset
             point_4_end_inner = end_height_vector+line_direction-end_max_radius_offset
-             
+
             """
             1) Top
             2) Front
@@ -1222,35 +1550,35 @@ class CustomSupportsReborn(Tool):
         
         self._support_size = new_value
         self._preferences.setValue("customsupportsreborn/support_size", new_value)
-        log("d", f"_support_size being set to {new_value}")
+        log("d", f"CustomSupportsReborn._support_size being set to {new_value}")
         self.propertyChanged.emit()
     
-    supportSize = property(getSupportSize, setSupportSize)
+    #supportSize = property(getSupportSize, setSupportSize)
 
-    def getSupportSizeMax(self) -> float:
-        return self._support_size_max
+    def getTaperedSize(self) -> float:
+        return self._tapered_size
   
-    def setSupportSizeMax(self, new_size: str) -> None:
+    def setTaperedSize(self, new_size: str) -> None:
         try:
             new_value = float(new_size)
         except ValueError:
             return
 
         if new_value < 0:
-            log("i", "Tried to set SupportSizeMax to < 0")
+            log("i", "Tried to set TaperedSize to < 0")
             return
         
-        self._support_size_max = new_value
-        self._preferences.setValue("customsupportsreborn/support_size_max", new_value)
-        log("d", f"_support_size_max being set to {new_value}")
+        self._tapered_size = new_value
+        self._preferences.setValue("customsupportsreborn/tapered_size", new_value)
+        log("d", f"CustomSupportsReborn._tapered_size being set to {new_value}")
         self.propertyChanged.emit()
     
-    supportSizeMax = property(getSupportSizeMax, setSupportSizeMax)
+    #supportSizeTapered = property(getSupportSizeTapered, setSupportSizeTapered)
         
-    def getSupportSizeInner(self) -> float:
-        return self._support_size_inner
+    def getWallWidth(self) -> float:
+        return self._wall_width
   
-    def setSupportSizeInner(self, new_size: str) -> None:
+    def setWallWidth(self, new_size: str) -> None:
         try:
             new_value = float(new_size)
         except ValueError:
@@ -1262,66 +1590,78 @@ class CustomSupportsReborn(Tool):
             new_value = self._support_size
         
         #Logger.log('d', 's_value : ' + str(s_value))        
-        self._support_size_inner = new_value
-        self._preferences.setValue("customsupportsreborn/support_size_inner", new_value)
-        log("d", f"_support_size_inner being set to {new_value}")
+        self._wall_width = new_value
+        self._preferences.setValue("customsupportsreborn/wall_width", new_value)
+        log("d", f"CustomSupportsReborn._wall_width being set to {new_value}")
         self.propertyChanged.emit()
     
-    supportSizeInner = property(getSupportSizeInner, setSupportSizeInner)
+    #wallWidth = property(getWallWidth, setWallWidth)
         
-    def getSupportAngle(self) -> float:
-        return self._support_angle
+    def getTaperAngle(self) -> float:
+        log("d", f"CustomSupportsReborn._taper_angle being read as {self._taper_angle} of type {type(self._taper_angle)}")
+        return self._taper_angle
   
-    def setSupportAngle(self, new_angle: str) -> None:
+    def setTaperAngle(self, new_angle: str) -> None:
         try:
             new_value = float(new_angle)
         except ValueError:
             return
 
-        if new_value < 0:
-            return
-        
         # Logger.log('d', 's_value : ' + str(s_value))        
-        self._support_angle = new_value
-        self._preferences.setValue("customsupportsreborn/support_angle", new_value)
-        log("d", f"_support_angle being set to {new_value}")
+        self._taper_angle = new_value
+        self._preferences.setValue("customsupportsreborn/taper_angle", new_value)
+        log("d", f"CustomSupportsReborn._taper_angle has been set to {self._taper_angle}")
         self.propertyChanged.emit()
 
-    supportAngle = property(getSupportAngle, setSupportAngle)
+    #taperAngle = property(getTaperAngle, setTaperAngle)
  
     def getPanelRemoveAllText(self) -> str:
         return self._panel_remove_all_text
     
     def setPanelRemoveAllText(self, new_text: str) -> None:
         self._panel_remove_all_text = str(new_text)
-        log("d", f"_panel_remove_all_text being set to {new_text}")
+        log("d", f"CustomSupporsReborn._panel_remove_all_text being set to {new_text}")
         self.propertyChanged.emit()
 
-    panelRemoveAllText = property(getPanelRemoveAllText, setPanelRemoveAllText)
+    #panelRemoveAllText = property(getPanelRemoveAllText, setPanelRemoveAllText)
         
     def getSupportType(self) -> str:
         return self._support_type
     
     def setSupportType(self, new_type: str) -> None:
         self._support_type = new_type
-        log("d", f"_support_type being set to {new_type}")
+        log("d", f"CustomSupportsReborn._support_type being set to {new_type}")
         self._preferences.setValue("customsupportsreborn/support_type", new_type)
         self.propertyChanged.emit()
 
-    supportType = property(getSupportType, setSupportType)
+    #supportType = property(getSupportType, setSupportType)
  
-    def getSupportSubtype(self) -> str:
+    def getModelSubtype(self) -> str:
         # Logger.log('d', 'Set SubType : ' + str(self._SubType))  
-        return self._support_subtype
+        return self._model_subtype
     
-    def setSupportSubtype(self, new_type: str) -> None:
-        self._support_subtype = new_type
+    def setModelSubtype(self, new_type: str) -> None:
+        self._model_subtype = new_type
         # Logger.log('d', 'Get SubType : ' + str(SubType))   
-        self._preferences.setValue("customsupportsreborn/support_subtype", new_type)
-        log("d", f"_support_subtype being set to {new_type}")
+        self._preferences.setValue("customsupportsreborn/model_subtype", new_type)
+        log("d", f"CustomSupportsReborn._model_subtype being set to {new_type}")
         self.propertyChanged.emit()
 
-    supportSubtype = property(getSupportSubtype, setSupportSubtype)
+    # modelSubtype = property(getModelSubtype, setModelSubtype)
+
+    """def getModelSubtypeIndex(self) -> int:
+        log_stack(f"CustomSupportsReborn: Stack for _model_subtype_index being read as {self._model_subtype_index}")
+        return self._model_subtype_index
+    
+    def setModelSubtypeIndex(self, new_index: int) -> None:
+        self._model_subtype_index = new_index
+        # Logger.log('d', 'Get SubType : ' + str(SubType))   
+        # log("d", f"_model_subtype_index being set to {new_index}")
+        log_stack(f"CustomSupportsReborn: Stack for _model_subtype_index being set to {new_index}")
+        self._preferences.setValue("customsupportsreborn/model_subtype_index", new_index)
+        self.propertyChanged.emit()
+
+    modelSubtypeIndex = property(getModelSubtypeIndex, setModelSubtypeIndex)"""
         
     def getSupportYDirection(self) -> bool:
         return self._support_y_direction
@@ -1334,10 +1674,10 @@ class CustomSupportsReborn(Tool):
         
         self._support_y_direction = new_value
         self._preferences.setValue("customsupportsreborn/support_y_direction", new_value)
-        log("d", f"_support_y_direction being set to {new_value}")
+        log("d", f"CustomSupportsReborn._support_y_direction being set to {new_value}")
         self.propertyChanged.emit()
 
-    supportYDirection = property(getSupportYDirection, setSupportYDirection)
+    #supportYDirection = property(getSupportYDirection, setSupportYDirection)
  
     def getAbutmentEqualizeHeights(self) -> bool:
         return self._abutment_equalize_heights
@@ -1350,10 +1690,10 @@ class CustomSupportsReborn(Tool):
 
         self._abutment_equalize_heights = new_value
         self._preferences.setValue("customsupportsreborn/abutment_equalize_heights", new_value)
-        log("d", f"_abutment_equalize_heights being set to {new_value}")
+        log("d", f"CustomSupportsReborn._abutment_equalize_heights being set to {new_value}")
         self.propertyChanged.emit()
 
-    abutmentEqualizeHeights = property(getAbutmentEqualizeHeights, setAbutmentEqualizeHeights)
+    #abutmentEqualizeHeights = property(getAbutmentEqualizeHeights, setAbutmentEqualizeHeights)
  
     def getModelScaleMain(self) -> bool:
         return self._model_scale_main
@@ -1366,10 +1706,10 @@ class CustomSupportsReborn(Tool):
 
         self._model_scale_main = new_value
         self._preferences.setValue("customsupportsreborn/model_scale_main", new_value)
-        log("d", f"_model_scale_main being set to {new_value}")
+        log("d", f"CustomSupportsReborn._model_scale_main being set to {new_value}")
         self.propertyChanged.emit()
 
-    modelScaleMain = property(getModelScaleMain, setModelScaleMain)
+    #modelScaleMain = property(getModelScaleMain, setModelScaleMain)
         
     def getModelOrient(self) -> bool:
         return self._model_orient
@@ -1382,10 +1722,10 @@ class CustomSupportsReborn(Tool):
 
         self._model_orient = new_value
         self._preferences.setValue("customsupportsreborn/model_orient", new_value)
-        log("d", f"_model_orient being set to {new_value}")
+        log("d", f"CustomSupportsReborn._model_orient being set to {new_value}")
         self.propertyChanged.emit()
     
-    modelOrient = property(getModelOrient, setModelOrient)
+    #modelOrient = property(getModelOrient, setModelOrient)
     
     def getModelMirror(self) -> bool:
         return self._model_mirror
@@ -1398,7 +1738,13 @@ class CustomSupportsReborn(Tool):
 
         self._model_mirror = new_value
         self._preferences.setValue("customsupportsreborn/model_mirror", new_value)
-        log("d", f"_model_mirror being set to {new_value}")
+        log("d", f"CustomSupportsReborn._model_mirror being set to {new_value}")
         self.propertyChanged.emit()
+    #modelMirror = property(getModelMirror, setModelMirror)
 
-    modelMirror = property(getModelMirror, setModelMirror)
+    def getLogMessage(self) -> str | None:
+        return None
+    
+    def setLogMessage(self, message: str) -> None:
+        log("i", f"CustomSupportsReborn QML Log: {message}")
+        self.propertyChanged.emit()
